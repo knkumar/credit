@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from calmmm.data.containers import MMMData, IncrementalityTests
+
 
 @pytest.fixture
 def synthetic_panel():
@@ -48,3 +50,40 @@ def synthetic_lift_df():
         "incremental_outcome": 12_000.0,
         "se": 2_500.0,
     }])
+
+
+@pytest.fixture
+def mmmdata(synthetic_panel):
+    return MMMData.from_dataframe(
+        synthetic_panel,
+        time="week",
+        geo="dma",
+        kpis=["visits", "applications", "approvals", "revenue"],
+        media=["search", "social"],
+        spend=["search_spend", "social_spend"],
+        exposure=["search_impressions", "social_impressions"],
+        controls=["price_index"],
+        population="population",
+        kpi_likelihoods={
+            "visits": "negative_binomial",
+            "applications": "negative_binomial",
+            "approvals": "negative_binomial",
+            "revenue": "gaussian",
+        },
+        funnel_stages=["visits", "applications", "approvals", "revenue"],
+    )
+
+
+@pytest.fixture
+def lift_tests(synthetic_lift_df, mmmdata):
+    return IncrementalityTests.from_dataframe(
+        synthetic_lift_df,
+        channel="channel",
+        kpi="kpi",
+        geo_scope="geo_scope",
+        start="start_date",
+        end="end_date",
+        lift="incremental_outcome",
+        standard_error="se",
+        mmmdata=mmmdata,
+    )
