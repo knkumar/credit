@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy.stats import weibull_min
 
 
 def geometric_adstock(x: np.ndarray, decay: float) -> np.ndarray:
@@ -9,6 +8,10 @@ def geometric_adstock(x: np.ndarray, decay: float) -> np.ndarray:
     Recursive geometric adstock: x_out[t] = x[t] + decay * x_out[t-1].
 
     decay must be in [0, 1).
+
+    NOTE: This is a pure-NumPy reference implementation. When wiring into a
+    PyMC model, a pytensor.scan-compatible version will be required so the
+    recurrence is traceable and differentiable by PyTensor's autodiff.
     """
     if not (0.0 <= decay < 1.0):
         raise ValueError(f"decay must be in [0, 1), got {decay}")
@@ -41,6 +44,8 @@ def weibull_adstock(
         raise ValueError(f"shape must be > 0, got {shape}")
     if scale <= 0:
         raise ValueError(f"scale must be > 0, got {scale}")
+
+    from scipy.stats import weibull_min  # lazy import — scipy is optional at module load time
 
     x = np.asarray(x, dtype=float)
     lags = np.arange(1, n_lags + 1, dtype=float)
