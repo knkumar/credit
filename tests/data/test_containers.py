@@ -240,6 +240,29 @@ def test_incrementality_tests_unknown_channel_raises(synthetic_panel, synthetic_
         )
 
 
+def test_incrementality_tests_unknown_kpi_raises(synthetic_panel, synthetic_lift_df):
+    dataset = MMMData.from_dataframe(
+        synthetic_panel,
+        time="week",
+        geo="dma",
+        kpis=["applications"],
+        media=["search"],
+        spend=["search_spend"],
+    )
+    with pytest.raises(ValueError, match="unknown kpi.*visits"):
+        IncrementalityTests.from_dataframe(
+            synthetic_lift_df,
+            channel="channel",
+            kpi="kpi",
+            geo_scope="geo_scope",
+            start="start_date",
+            end="end_date",
+            lift="incremental_outcome",
+            standard_error="se",
+            mmmdata=dataset,
+        )
+
+
 def test_incrementality_tests_date_outside_panel_raises(synthetic_panel):
     dataset = MMMData.from_dataframe(
         synthetic_panel,
