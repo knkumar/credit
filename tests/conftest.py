@@ -1,0 +1,50 @@
+import numpy as np
+import pandas as pd
+import pytest
+
+
+@pytest.fixture
+def synthetic_panel():
+    """52-week panel: 2 geos, 4 KPIs (visits/applications/approvals/revenue), 2 channels."""
+    rng = np.random.default_rng(42)
+    weeks = pd.date_range("2024-01-01", periods=52, freq="W-MON")
+    geos = [("DMA_1", 1_000_000), ("DMA_2", 500_000)]
+    rows = []
+    for geo, pop in geos:
+        search_spend = rng.uniform(1_000, 5_000, 52)
+        social_spend = rng.uniform(500, 2_000, 52)
+        for i, week in enumerate(weeks):
+            visits = int(5_000 + search_spend[i] * 2 + social_spend[i] * 0.5 + rng.normal(0, 200))
+            applications = int(max(0, visits * 0.05 + rng.normal(0, 20)))
+            approvals = int(max(0, applications * 0.6 + rng.normal(0, 5)))
+            revenue = max(0.0, approvals * 300 + rng.normal(0, 500))
+            rows.append({
+                "week": week,
+                "dma": geo,
+                "search_spend": search_spend[i],
+                "social_spend": social_spend[i],
+                "search_impressions": search_spend[i] * 100,
+                "social_impressions": social_spend[i] * 150,
+                "visits": visits,
+                "applications": applications,
+                "approvals": approvals,
+                "revenue": revenue,
+                "price_index": rng.uniform(0.9, 1.1),
+                "population": pop,
+            })
+    return pd.DataFrame(rows)
+
+
+@pytest.fixture
+def synthetic_lift_df():
+    """One geo-holdout experiment: Search on visits."""
+    return pd.DataFrame([{
+        "test_id": "search_holdout_q1",
+        "channel": "search",
+        "kpi": "visits",
+        "geo_scope": "DMA_1",
+        "start_date": pd.Timestamp("2024-03-04"),
+        "end_date": pd.Timestamp("2024-03-25"),
+        "incremental_outcome": 12_000.0,
+        "se": 2_500.0,
+    }])
