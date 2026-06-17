@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 
 
@@ -14,7 +12,7 @@ class MediaScaler:
     """
 
     def __init__(self) -> None:
-        self._max: Optional[float] = None
+        self._max: float | None = None
 
     def fit_transform(self, spend: np.ndarray) -> np.ndarray:
         spend = np.asarray(spend, dtype=float)
