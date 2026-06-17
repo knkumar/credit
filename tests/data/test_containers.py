@@ -1,0 +1,92 @@
+import pytest
+import pandas as pd
+from calmmm.data.schema import (
+    ObservationRow,
+    MediaRow,
+    ControlRow,
+    KPIMetadata,
+    ExperimentRow,
+    KPILikelihood,
+    CalibrationLikelihood,
+    Estimand,
+)
+
+
+def test_observation_row_fields():
+    row = ObservationRow(
+        time=pd.Timestamp("2024-01-01"),
+        geo="DMA_1",
+        kpi="visits",
+        outcome=5000.0,
+        population=1_000_000.0,
+    )
+    assert row.kpi == "visits"
+    assert row.population == 1_000_000.0
+
+
+def test_kpi_metadata_defaults():
+    meta = KPIMetadata(kpi="visits")
+    assert meta.likelihood == KPILikelihood.NEGATIVE_BINOMIAL
+    assert meta.funnel_stage is None
+
+
+def test_experiment_row_requires_se_or_ci():
+    with pytest.raises(ValueError, match="se or ci_lower/ci_upper"):
+        ExperimentRow(
+            test_id="t1",
+            channel_bundle=["search"],
+            kpi="visits",
+            geo_scope=["DMA_1"],
+            start_date=pd.Timestamp("2024-03-01"),
+            end_date=pd.Timestamp("2024-03-28"),
+            lift=12_000.0,
+        )
+
+
+def test_experiment_row_ci_converted_to_se():
+    row = ExperimentRow(
+        test_id="t1",
+        channel_bundle=["search"],
+        kpi="visits",
+        geo_scope=["DMA_1"],
+        start_date=pd.Timestamp("2024-03-01"),
+        end_date=pd.Timestamp("2024-03-28"),
+        lift=12_000.0,
+        ci_lower=7_100.0,
+        ci_upper=16_900.0,
+    )
+    # se = (16900 - 7100) / (2 * 1.96) ≈ 2500
+    assert abs(row.se - 2_500.0) < 1.0
+
+
+def test_experiment_row_se_provided_directly():
+    row = ExperimentRow(
+        test_id="t2",
+        channel_bundle=["social"],
+        kpi="applications",
+        geo_scope=["DMA_1", "DMA_2"],
+        start_date=pd.Timestamp("2024-04-01"),
+        end_date=pd.Timestamp("2024-04-28"),
+        lift=500.0,
+        se=100.0,
+    )
+    assert row.se == 100.0
+
+
+def test_kpi_likelihood_enum_values():
+    assert KPILikelihood.GAUSSIAN == "gaussian"
+    assert KPILikelihood.NEGATIVE_BINOMIAL == "negative_binomial"
+    assert KPILikelihood.BINOMIAL == "binomial"
+    assert KPILikelihood.LOGNORMAL == "lognormal"
+
+
+def test_calibration_likelihood_enum_values():
+    assert CalibrationLikelihood.NORMAL == "normal"
+    assert CalibrationLikelihood.STUDENT_T == "student_t"
+
+
+def test_estimand_enum_values():
+    assert Estimand.TOTAL == "total"
+    assert Estimand.IMMEDIATE == "immediate"
+    assert Estimand.CARRYOVER == "carryover"
+    assert Estimand.CUMULATIVE == "cumulative"
