@@ -11,7 +11,7 @@ from calmmm.data.schema import (
     CalibrationLikelihood,
     Estimand,
 )
-from calmmm.data.containers import MMMData
+from calmmm.data.containers import MMMData, IncrementalityTests
 
 
 def test_observation_row_fields():
@@ -190,3 +190,84 @@ def test_mmmdata_date_range(synthetic_panel):
     )
     assert dataset.start_date == pd.Timestamp("2024-01-01")
     assert dataset.n_times == 52
+
+
+def test_incrementality_tests_happy_path(synthetic_panel, synthetic_lift_df):
+    dataset = MMMData.from_dataframe(
+        synthetic_panel,
+        time="week",
+        geo="dma",
+        kpis=["visits", "applications"],
+        media=["search", "social"],
+        spend=["search_spend", "social_spend"],
+    )
+    experiments = IncrementalityTests.from_dataframe(
+        synthetic_lift_df,
+        channel="channel",
+        kpi="kpi",
+        geo_scope="geo_scope",
+        start="start_date",
+        end="end_date",
+        lift="incremental_outcome",
+        standard_error="se",
+        mmmdata=dataset,
+    )
+    assert len(experiments) == 1
+    assert experiments[0].test_id == "search_holdout_q1"
+    assert experiments[0].se == 2_500.0
+
+
+def test_incrementality_tests_unknown_channel_raises(synthetic_panel, synthetic_lift_df):
+    dataset = MMMData.from_dataframe(
+        synthetic_panel,
+        time="week",
+        geo="dma",
+        kpis=["visits"],
+        media=["social"],
+        spend=["social_spend"],
+    )
+    with pytest.raises(ValueError, match="unknown channel.*search"):
+        IncrementalityTests.from_dataframe(
+            synthetic_lift_df,
+            channel="channel",
+            kpi="kpi",
+            geo_scope="geo_scope",
+            start="start_date",
+            end="end_date",
+            lift="incremental_outcome",
+            standard_error="se",
+            mmmdata=dataset,
+        )
+
+
+def test_incrementality_tests_date_outside_panel_raises(synthetic_panel):
+    dataset = MMMData.from_dataframe(
+        synthetic_panel,
+        time="week",
+        geo="dma",
+        kpis=["visits"],
+        media=["search"],
+        spend=["search_spend"],
+    )
+    bad_lift = pd.DataFrame([{
+        "test_id": "future_test",
+        "channel": "search",
+        "kpi": "visits",
+        "geo_scope": "DMA_1",
+        "start_date": pd.Timestamp("2025-01-01"),
+        "end_date": pd.Timestamp("2025-02-01"),
+        "incremental_outcome": 5_000.0,
+        "se": 1_000.0,
+    }])
+    with pytest.raises(ValueError, match="outside the observed date range"):
+        IncrementalityTests.from_dataframe(
+            bad_lift,
+            channel="channel",
+            kpi="kpi",
+            geo_scope="geo_scope",
+            start="start_date",
+            end="end_date",
+            lift="incremental_outcome",
+            standard_error="se",
+            mmmdata=dataset,
+        )
