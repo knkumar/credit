@@ -19,6 +19,7 @@ def test_build_coords_lists_are_sorted(mmmdata):
     assert coords["geo"] == sorted(coords["geo"])
     assert coords["kpi"] == sorted(coords["kpi"])
     assert coords["channel"] == sorted(coords["channel"])
+    assert coords["time"] == sorted(coords["time"])
 
 
 def test_build_arrays_shapes(mmmdata):
@@ -48,5 +49,5 @@ def test_build_arrays_media_nonneg(mmmdata):
 
 def test_build_arrays_population_positive(mmmdata):
     _, _, pop = build_arrays(mmmdata)
-    # synthetic_panel provides population; should be positive (not NaN)
-    assert np.all(pop > 0) or np.all(np.isnan(pop))  # either populated or all NaN
+    # synthetic_panel provides full population coverage — every cell must be positive
+    assert np.all(pop > 0)
