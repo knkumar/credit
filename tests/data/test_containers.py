@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 import pandas as pd
 from calmmm.data.schema import (
     ObservationRow,
@@ -10,6 +11,7 @@ from calmmm.data.schema import (
     CalibrationLikelihood,
     Estimand,
 )
+from calmmm.data.containers import MMMData
 
 
 def test_observation_row_fields():
@@ -119,3 +121,72 @@ def test_experiment_row_zero_se_raises():
             lift=12_000.0,
             se=0.0,
         )
+
+
+def test_mmmdata_happy_path(synthetic_panel):
+    dataset = MMMData.from_dataframe(
+        synthetic_panel,
+        time="week",
+        geo="dma",
+        kpis=["visits", "applications", "approvals", "revenue"],
+        media=["search", "social"],
+        spend=["search_spend", "social_spend"],
+        exposure=["search_impressions", "social_impressions"],
+        controls=["price_index"],
+        population="population",
+    )
+    assert dataset.n_geos == 2
+    assert dataset.n_kpis == 4
+    assert dataset.n_channels == 2
+    assert dataset.n_times == 52
+    assert set(dataset.channels) == {"search", "social"}
+    assert set(dataset.kpis) == {"visits", "applications", "approvals", "revenue"}
+
+
+def test_mmmdata_observations_shape(synthetic_panel):
+    dataset = MMMData.from_dataframe(
+        synthetic_panel,
+        time="week",
+        geo="dma",
+        kpis=["visits", "applications"],
+        media=["search"],
+        spend=["search_spend"],
+    )
+    assert len(dataset.observations) == 52 * 2 * 2
+
+
+def test_mmmdata_media_shape(synthetic_panel):
+    dataset = MMMData.from_dataframe(
+        synthetic_panel,
+        time="week",
+        geo="dma",
+        kpis=["visits"],
+        media=["search", "social"],
+        spend=["search_spend", "social_spend"],
+    )
+    assert len(dataset.media) == 52 * 2 * 2
+
+
+def test_mmmdata_requires_matching_spend_and_media(synthetic_panel):
+    with pytest.raises(ValueError, match="media and spend must have the same length"):
+        MMMData.from_dataframe(
+            synthetic_panel,
+            time="week",
+            geo="dma",
+            kpis=["visits"],
+            media=["search", "social"],
+            spend=["search_spend"],
+        )
+
+
+def test_mmmdata_date_range(synthetic_panel):
+    dataset = MMMData.from_dataframe(
+        synthetic_panel,
+        time="week",
+        geo="dma",
+        kpis=["visits"],
+        media=["search"],
+        spend=["search_spend"],
+    )
+    assert dataset.start_date == pd.Timestamp("2024-01-01")
+    assert dataset.n_times == 52
