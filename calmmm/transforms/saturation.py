@@ -37,7 +37,7 @@ def ispline_basis(x: np.ndarray, n_knots: int = 4, degree: int = 3) -> np.ndarra
 
     Returns array of shape (len(x), n_basis) where n_basis = n_knots + degree - 1.
     """
-    from scipy.interpolate import BSpline
+    from scipy.interpolate import BSpline  # lazy import — scipy is optional at module load time
 
     x = np.asarray(x, dtype=float)
     x_min, x_max = x.min(), x.max()
