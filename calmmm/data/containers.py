@@ -6,6 +6,8 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from calmmm.data.schema import ExperimentRow, CalibrationLikelihood, Estimand
+
 
 @dataclass
 class MMMData:
@@ -144,4 +146,111 @@ class MMMData:
             media=media_df,
             controls=controls_df,
             kpi_metadata=kpi_metadata,
+        )
+
+
+class IncrementalityTests:
+    def __init__(self, experiments: list[ExperimentRow]) -> None:
+        self._experiments = experiments
+
+    def __len__(self) -> int:
+        return len(self._experiments)
+
+    def __getitem__(self, idx: int) -> ExperimentRow:
+        return self._experiments[idx]
+
+    def __iter__(self):
+        return iter(self._experiments)
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        df: pd.DataFrame,
+        *,
+        channel: str,
+        kpi: str,
+        geo_scope: str,
+        start: str,
+        end: str,
+        lift: str,
+        standard_error: Optional[str] = None,
+        ci_lower: Optional[str] = None,
+        ci_upper: Optional[str] = None,
+        calibration_likelihood: str = "normal",
+        student_t_nu: float = 5.0,
+        estimand: str = "total",
+        mmmdata: Optional["MMMData"] = None,
+    ) -> "IncrementalityTests":
+        experiments = []
+        for i, row in df.iterrows():
+            se = float(row[standard_error]) if standard_error and standard_error in df.columns else None
+            ci_lo = float(row[ci_lower]) if ci_lower and ci_lower in df.columns else None
+            ci_hi = float(row[ci_upper]) if ci_upper and ci_upper in df.columns else None
+
+            channel_val = row[channel]
+            channels = (
+                [c.strip() for c in channel_val.split(",")]
+                if isinstance(channel_val, str)
+                else [str(channel_val)]
+            )
+
+            geo_val = row[geo_scope]
+            geos = (
+                [g.strip() for g in geo_val.split(",")]
+                if isinstance(geo_val, str)
+                else [str(geo_val)]
+            )
+
+            test_id = str(row["test_id"]) if "test_id" in df.columns else f"exp_{i}"
+
+            exp = ExperimentRow(
+                test_id=test_id,
+                channel_bundle=channels,
+                kpi=str(row[kpi]),
+                geo_scope=geos,
+                start_date=pd.Timestamp(row[start]),
+                end_date=pd.Timestamp(row[end]),
+                lift=float(row[lift]),
+                se=se,
+                ci_lower=ci_lo,
+                ci_upper=ci_hi,
+                calibration_likelihood=CalibrationLikelihood(calibration_likelihood),
+                student_t_nu=student_t_nu,
+                estimand=Estimand(estimand),
+            )
+
+            if mmmdata is not None:
+                _validate_experiment_against_dataset(exp, mmmdata)
+
+            experiments.append(exp)
+
+        return cls(experiments)
+
+
+def _validate_experiment_against_dataset(
+    exp: ExperimentRow, dataset: "MMMData"
+) -> None:
+    known_channels = set(dataset.channels)
+    for ch in exp.channel_bundle:
+        if ch not in known_channels:
+            raise ValueError(
+                f"unknown channel '{ch}' in experiment '{exp.test_id}'; "
+                f"known channels: {sorted(known_channels)}"
+            )
+
+    known_kpis = set(dataset.kpis)
+    if exp.kpi not in known_kpis:
+        raise ValueError(
+            f"unknown kpi '{exp.kpi}' in experiment '{exp.test_id}'; "
+            f"known kpis: {sorted(known_kpis)}"
+        )
+
+    panel_start = dataset.start_date
+    panel_end = dataset.end_date
+    if exp.start_date < panel_start or exp.end_date > panel_end:
+        raise ValueError(
+            f"experiment '{exp.test_id}' window "
+            f"[{exp.start_date.date()}, {exp.end_date.date()}] "
+            f"is outside the observed date range "
+            f"[{panel_start.date()}, {panel_end.date()}]"
         )
