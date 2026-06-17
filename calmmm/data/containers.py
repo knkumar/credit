@@ -1,0 +1,141 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Optional
+
+import numpy as np
+import pandas as pd
+
+
+@dataclass
+class MMMData:
+    observations: pd.DataFrame  # columns: time, geo, kpi, outcome, population
+    media: pd.DataFrame         # columns: time, geo, channel, spend, exposure
+    controls: pd.DataFrame      # columns: time, geo, control, value
+    kpi_metadata: pd.DataFrame  # columns: kpi, likelihood, funnel_stage, family
+
+    @property
+    def n_geos(self) -> int:
+        return self.observations["geo"].nunique()
+
+    @property
+    def n_kpis(self) -> int:
+        return self.observations["kpi"].nunique()
+
+    @property
+    def n_channels(self) -> int:
+        return self.media["channel"].nunique()
+
+    @property
+    def n_times(self) -> int:
+        return self.observations["time"].nunique()
+
+    @property
+    def channels(self) -> list[str]:
+        return sorted(self.media["channel"].unique().tolist())
+
+    @property
+    def kpis(self) -> list[str]:
+        return sorted(self.observations["kpi"].unique().tolist())
+
+    @property
+    def geos(self) -> list[str]:
+        return sorted(self.observations["geo"].unique().tolist())
+
+    @property
+    def times(self) -> list[pd.Timestamp]:
+        return sorted(self.observations["time"].unique().tolist())
+
+    @property
+    def start_date(self) -> pd.Timestamp:
+        return self.observations["time"].min()
+
+    @property
+    def end_date(self) -> pd.Timestamp:
+        return self.observations["time"].max()
+
+    @classmethod
+    def from_dataframe(
+        cls,
+        df: pd.DataFrame,
+        *,
+        time: str,
+        geo: str,
+        kpis: list[str],
+        media: list[str],
+        spend: list[str],
+        exposure: Optional[list[str]] = None,
+        controls: Optional[list[str]] = None,
+        population: Optional[str] = None,
+        kpi_likelihoods: Optional[dict[str, str]] = None,
+        funnel_stages: Optional[list[str]] = None,
+    ) -> "MMMData":
+        if len(media) != len(spend):
+            raise ValueError(
+                f"media and spend must have the same length, "
+                f"got media={len(media)} spend={len(spend)}"
+            )
+        if exposure is not None and len(exposure) != len(media):
+            raise ValueError(
+                f"exposure must have the same length as media, "
+                f"got exposure={len(exposure)} media={len(media)}"
+            )
+
+        df = df.copy()
+        df[time] = pd.to_datetime(df[time])
+
+        # Build observations: long format (one row per time x geo x kpi)
+        obs_rows = []
+        for kpi in kpis:
+            kpi_df = df[[time, geo, kpi]].copy()
+            kpi_df.columns = ["time", "geo", "outcome"]
+            kpi_df["kpi"] = kpi
+            kpi_df["population"] = df[population].values if population is not None else np.nan
+            obs_rows.append(kpi_df)
+        observations = pd.concat(obs_rows, ignore_index=True)
+
+        # Build media: long format (one row per time x geo x channel)
+        media_rows = []
+        for idx, (ch_name, sp_col) in enumerate(zip(media, spend)):
+            m_df = df[[time, geo, sp_col]].copy()
+            m_df.columns = ["time", "geo", "spend"]
+            m_df["channel"] = ch_name
+            m_df["exposure"] = df[exposure[idx]].values if exposure is not None else np.nan
+            media_rows.append(m_df)
+        media_df = pd.concat(media_rows, ignore_index=True)
+
+        # Build controls: long format (one row per time x geo x control)
+        if controls:
+            ctrl_rows = []
+            for ctrl in controls:
+                c_df = df[[time, geo, ctrl]].copy()
+                c_df.columns = ["time", "geo", "value"]
+                c_df["control"] = ctrl
+                ctrl_rows.append(c_df)
+            controls_df = pd.concat(ctrl_rows, ignore_index=True)
+        else:
+            controls_df = pd.DataFrame(columns=["time", "geo", "control", "value"])
+
+        # Build kpi_metadata
+        kpi_meta_rows = []
+        for kpi in kpis:
+            likelihood = (kpi_likelihoods or {}).get(kpi, "negative_binomial")
+            stage = (
+                funnel_stages.index(kpi)
+                if funnel_stages and kpi in funnel_stages
+                else None
+            )
+            kpi_meta_rows.append({
+                "kpi": kpi,
+                "likelihood": likelihood,
+                "funnel_stage": stage,
+                "family": None,
+            })
+        kpi_metadata = pd.DataFrame(kpi_meta_rows)
+
+        return cls(
+            observations=observations,
+            media=media_df,
+            controls=controls_df,
+            kpi_metadata=kpi_metadata,
+        )
