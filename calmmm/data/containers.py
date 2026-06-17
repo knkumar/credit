@@ -85,32 +85,38 @@ class MMMData:
         df[time] = pd.to_datetime(df[time])
 
         # Build observations: long format (one row per time x geo x kpi)
+        # column order: time, geo, kpi, outcome, population
         obs_rows = []
         for kpi in kpis:
-            kpi_df = df[[time, geo, kpi]].copy()
-            kpi_df.columns = ["time", "geo", "outcome"]
+            kpi_df = df[[time, geo]].copy()
+            kpi_df.columns = ["time", "geo"]
             kpi_df["kpi"] = kpi
+            kpi_df["outcome"] = df[kpi].values
             kpi_df["population"] = df[population].values if population is not None else np.nan
             obs_rows.append(kpi_df)
         observations = pd.concat(obs_rows, ignore_index=True)
 
         # Build media: long format (one row per time x geo x channel)
+        # column order: time, geo, channel, spend, exposure
         media_rows = []
         for idx, (ch_name, sp_col) in enumerate(zip(media, spend)):
-            m_df = df[[time, geo, sp_col]].copy()
-            m_df.columns = ["time", "geo", "spend"]
+            m_df = df[[time, geo]].copy()
+            m_df.columns = ["time", "geo"]
             m_df["channel"] = ch_name
+            m_df["spend"] = df[sp_col].values
             m_df["exposure"] = df[exposure[idx]].values if exposure is not None else np.nan
             media_rows.append(m_df)
         media_df = pd.concat(media_rows, ignore_index=True)
 
         # Build controls: long format (one row per time x geo x control)
+        # column order: time, geo, control, value
         if controls:
             ctrl_rows = []
             for ctrl in controls:
-                c_df = df[[time, geo, ctrl]].copy()
-                c_df.columns = ["time", "geo", "value"]
+                c_df = df[[time, geo]].copy()
+                c_df.columns = ["time", "geo"]
                 c_df["control"] = ctrl
+                c_df["value"] = df[ctrl].values
                 ctrl_rows.append(c_df)
             controls_df = pd.concat(ctrl_rows, ignore_index=True)
         else:
