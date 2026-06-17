@@ -1,8 +1,14 @@
+import os
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from calmmm.data.containers import MMMData, IncrementalityTests
+
+# Disable PyTensor C compilation (clang on this host passes -ld64 which is not
+# a library; pure-Python mode works fine for tests).
+os.environ.setdefault("PYTENSOR_FLAGS", "cxx=")
 
 
 @pytest.fixture
