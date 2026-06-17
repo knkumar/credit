@@ -19,7 +19,8 @@ def test_adstock_zero_decay_equals_input():
 
 def test_adstock_shape():
     T, G, C = 10, 2, 3
-    X = np.random.rand(T, G, C)
+    rng = np.random.default_rng(0)
+    X = rng.random((T, G, C))
     decay = np.array([0.5, 0.3, 0.7])
     result = geometric_adstock_pt(
         pt.as_tensor_variable(X), pt.as_tensor_variable(decay)
@@ -35,9 +36,9 @@ def test_adstock_accumulates_over_time():
     result = geometric_adstock_pt(
         pt.as_tensor_variable(X), pt.as_tensor_variable(decay)
     ).eval()
-    # t=0: h=1, t=1: h=1.5, t=2: h=1.75, ... plateau near 2.0
+    # t=0: h=1, t=1: h=1.5, t=2: h=1.75, ... plateau near 2.0 (limit = 1/(1-0.5))
     assert result[0, 0, 0] < result[5, 0, 0]
-    assert result[5, 0, 0] < result[15, 0, 0] + 0.01  # nearly converged
+    assert abs(result[15, 0, 0] - 2.0) < 0.01  # converged to within 1% of limit
 
 
 def test_adstock_full_decay_doubles_immediately():

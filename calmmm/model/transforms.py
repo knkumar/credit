@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 import pytensor
 import pytensor.tensor as pt
 
@@ -50,6 +51,8 @@ def hill_saturation_pt(X, alpha, k):
     # Broadcast alpha and k over leading [T, G] dims for X shape [T, G, C]
     a = alpha[None, None, :]
     kk = k[None, None, :]
-    x_pow = X ** a
+    # Clip to non-negative: fractional alpha on negative X yields NaN in real arithmetic
+    X_safe = pt.clip(X, 0.0, np.inf)
+    x_pow = X_safe ** a
     k_pow = kk ** a
     return x_pow / (x_pow + k_pow + 1e-9)
