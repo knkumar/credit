@@ -84,4 +84,10 @@ class ExperimentRow:
                 raise ValueError(
                     "ExperimentRow requires either se or ci_lower/ci_upper"
                 )
+            if self.ci_upper < self.ci_lower:
+                raise ValueError(
+                    f"ci_upper ({self.ci_upper}) must be >= ci_lower ({self.ci_lower})"
+                )
             self.se = (self.ci_upper - self.ci_lower) / (2 * 1.96)
+        if self.se <= 0:
+            raise ValueError(f"se must be > 0, got {self.se}")
