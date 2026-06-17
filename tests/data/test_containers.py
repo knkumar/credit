@@ -90,3 +90,32 @@ def test_estimand_enum_values():
     assert Estimand.IMMEDIATE == "immediate"
     assert Estimand.CARRYOVER == "carryover"
     assert Estimand.CUMULATIVE == "cumulative"
+
+
+def test_experiment_row_inverted_ci_raises():
+    with pytest.raises(ValueError, match="ci_upper.*>=.*ci_lower"):
+        ExperimentRow(
+            test_id="t3",
+            channel_bundle=["search"],
+            kpi="visits",
+            geo_scope=["DMA_1"],
+            start_date=pd.Timestamp("2024-03-01"),
+            end_date=pd.Timestamp("2024-03-28"),
+            lift=12_000.0,
+            ci_lower=16_900.0,
+            ci_upper=7_100.0,  # inverted: upper < lower
+        )
+
+
+def test_experiment_row_zero_se_raises():
+    with pytest.raises(ValueError, match="se must be > 0"):
+        ExperimentRow(
+            test_id="t4",
+            channel_bundle=["search"],
+            kpi="visits",
+            geo_scope=["DMA_1"],
+            start_date=pd.Timestamp("2024-03-01"),
+            end_date=pd.Timestamp("2024-03-28"),
+            lift=12_000.0,
+            se=0.0,
+        )
