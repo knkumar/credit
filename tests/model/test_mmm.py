@@ -71,3 +71,47 @@ def test_build_model_obs_nodes_per_kpi(mmmdata):
     obs_names = {v.name for v in model.observed_RVs}
     for kpi in mmmdata.kpis:
         assert f"obs_{kpi}" in obs_names
+
+
+import arviz as az
+
+
+def test_fit_sample_returns_mmmfit(mmmdata):
+    mmm = HierarchicalMMM()
+    fit = mmm.fit(mmmdata, mode="sample", draws=50, tune=50, chains=1, progressbar=False, random_seed=42)
+    from calmmm.model.fit import MMMFit
+    assert isinstance(fit, MMMFit)
+    assert fit.trace is not None
+    assert isinstance(fit.trace, az.InferenceData)
+    assert fit.model is not None
+    assert fit.data is mmmdata
+
+
+def test_fit_vi_returns_mmmfit(mmmdata):
+    mmm = HierarchicalMMM()
+    fit = mmm.fit(mmmdata, mode="vi", n=100, progressbar=False)
+    from calmmm.model.fit import MMMFit
+    assert isinstance(fit, MMMFit)
+    assert fit.trace is not None
+
+
+def test_fit_map_returns_mmmfit(mmmdata):
+    mmm = HierarchicalMMM()
+    fit = mmm.fit(mmmdata, mode="map")
+    from calmmm.model.fit import MMMFit
+    assert isinstance(fit, MMMFit)
+    assert fit.map_params is not None
+    assert isinstance(fit.map_params, dict)
+
+
+def test_fit_invalid_mode_raises(mmmdata):
+    mmm = HierarchicalMMM()
+    with pytest.raises(ValueError, match="mode"):
+        mmm.fit(mmmdata, mode="invalid")
+
+
+def test_fit_reuses_built_model(mmmdata):
+    mmm = HierarchicalMMM()
+    model = mmm.build_model(mmmdata)
+    fit = mmm.fit(mmmdata, mode="map")
+    assert fit.model is model
