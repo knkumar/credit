@@ -104,10 +104,9 @@ def _build_media_hierarchy(
     # Contribution: einsum-style sum over channels
     # X_sat [T,G,C] → [T,G,1,C]; scale_geo [C,K,G] → [G,K,C] → [1,G,K,C]
     scale_geo_gkc = scale_geo.dimshuffle(2, 1, 0)  # [G, K, C]
-    media_contrib = (
-        X_sat[:, :, None, :] * scale_geo_gkc[None, :, :, :]
-    ).sum(axis=-1)
-    return media_contrib  # [T, G, K]
+    channel_contrib_tgkc = X_sat[:, :, None, :] * scale_geo_gkc[None, :, :, :]  # [T, G, K, C]
+    pm.Deterministic("channel_contrib", channel_contrib_tgkc)
+    return channel_contrib_tgkc.sum(axis=-1)  # [T, G, K]
 
 
 def _add_likelihood(
