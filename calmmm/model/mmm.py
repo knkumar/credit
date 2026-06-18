@@ -12,6 +12,8 @@ from calmmm.model.priors import PriorConfig
 from calmmm.model.transforms import geometric_adstock_pt, hill_saturation_pt
 from calmmm.model.components import _build_baseline, _build_media_hierarchy, _add_likelihood
 from calmmm.transforms.seasonality import fourier_features
+from calmmm.calibration.targets import build_calibration_targets
+from calmmm.calibration.likelihood import add_calibration_likelihood
 
 
 class HierarchicalMMM:
@@ -43,8 +45,9 @@ class HierarchicalMMM:
         self._media_scaled: Optional[np.ndarray] = None
         self._fourier_matrix: Optional[np.ndarray] = None
         self._pop_array: Optional[np.ndarray] = None
+        self._calibration_targets: list = []
 
-    def build_model(self, data: MMMData) -> pm.Model:
+    def build_model(self, data: MMMData, experiments=None) -> pm.Model:
         """
         Construct the PyMC model for the given dataset.
 
@@ -141,12 +144,22 @@ class HierarchicalMMM:
             )
 
         self._model = model
+
+        if experiments is not None:
+            targets = build_calibration_targets(experiments, data, self._train_mask)
+            with model:
+                add_calibration_likelihood(model, targets)
+            self._calibration_targets = targets
+        else:
+            self._calibration_targets = []
+
         return model
 
     def fit(
         self,
         data: MMMData,
         *,
+        experiments=None,
         mode: str = "sample",
         **kwargs,
     ) -> "MMMFit":
@@ -166,7 +179,7 @@ class HierarchicalMMM:
         from calmmm.model.fit import MMMFit
 
         if self._model is None or self._data is not data:
-            self.build_model(data)
+            self.build_model(data, experiments=experiments)
 
         model = self._model
 
@@ -174,7 +187,7 @@ class HierarchicalMMM:
             kwargs.setdefault("progressbar", False)
             with model:
                 trace = pm.sample(**kwargs)
-            return MMMFit(trace=trace, map_params=None, model=model, data=data, _mmm=self)
+            return MMMFit(trace=trace, map_params=None, model=model, data=data, _mmm=self, calibration_targets=self._calibration_targets)
 
         elif mode == "vi":
             kwargs.setdefault("progressbar", False)
@@ -183,12 +196,12 @@ class HierarchicalMMM:
             with model:
                 approx = pm.fit(n=n, **kwargs)
                 trace = approx.sample(draws=200)
-            return MMMFit(trace=trace, map_params=None, model=model, data=data, _mmm=self)
+            return MMMFit(trace=trace, map_params=None, model=model, data=data, _mmm=self, calibration_targets=self._calibration_targets)
 
         elif mode == "map":
             with model:
                 map_params = pm.find_MAP(**kwargs)
-            return MMMFit(trace=None, map_params=map_params, model=model, data=data, _mmm=self)
+            return MMMFit(trace=None, map_params=map_params, model=model, data=data, _mmm=self, calibration_targets=self._calibration_targets)
 
         else:
             raise ValueError(
