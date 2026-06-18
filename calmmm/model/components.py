@@ -110,6 +110,68 @@ def _build_media_hierarchy(
     return media_contrib  # [T, G, K]
 
 
-def _add_likelihood(mu, obs_array, pop_array, kpi_metadata, kpis, priors):
-    """Stub — implemented in Task 6."""
-    raise NotImplementedError("_add_likelihood implemented in Task 6")
+def _add_likelihood(
+    mu: pt.TensorVariable,
+    obs_array: np.ndarray,
+    pop_array: np.ndarray,
+    kpi_metadata,
+    kpis: list[str],
+    priors: PriorConfig,
+) -> None:
+    """
+    Add per-KPI observed likelihood nodes to the current pm.Model context.
+
+    Parameters
+    ----------
+    mu : pytensor tensor [T, G, K] — log-scale linear predictor
+    obs_array : [T, G, K] float64 — observed outcomes
+    pop_array : [T, G, K] float64 — population (NaN where not used)
+    kpi_metadata : pd.DataFrame with columns "kpi", "likelihood"
+    kpis : list[str] — KPI names in axis-K order
+    priors : PriorConfig
+
+    Link function: log-link (exp(mu_k) is the mean for all non-binomial likelihoods).
+    Binomial uses sigmoid(mu_k) as probability.
+    """
+    for k, kpi in enumerate(kpis):
+        row = kpi_metadata.loc[kpi_metadata["kpi"] == kpi]
+        likelihood = row["likelihood"].values[0]
+        y_obs = obs_array[:, :, k]
+        mu_k = mu[:, :, k]
+
+        if likelihood == "gaussian":
+            sigma_k = pm.HalfNormal(f"sigma_{kpi}", sigma=priors.sigma_sigma)
+            pm.Normal(f"obs_{kpi}", mu=pm.math.exp(mu_k), sigma=sigma_k, observed=y_obs)
+
+        elif likelihood == "lognormal":
+            sigma_k = pm.HalfNormal(f"sigma_{kpi}", sigma=priors.sigma_sigma)
+            pm.LogNormal(f"obs_{kpi}", mu=mu_k, sigma=sigma_k, observed=y_obs)
+
+        elif likelihood == "negative_binomial":
+            alpha_k = pm.HalfNormal(f"nb_alpha_{kpi}", sigma=priors.nb_alpha_sigma)
+            pm.NegativeBinomial(
+                f"obs_{kpi}",
+                mu=pm.math.exp(mu_k),
+                alpha=alpha_k,
+                observed=y_obs,
+            )
+
+        elif likelihood == "binomial":
+            n_pop = pop_array[:, :, k]
+            if np.any(np.isnan(n_pop)):
+                raise ValueError(
+                    f"KPI '{kpi}' has likelihood='binomial' but population is NaN. "
+                    "Provide a population column in MMMData."
+                )
+            pm.Binomial(
+                f"obs_{kpi}",
+                n=n_pop.astype(int),
+                p=pm.math.sigmoid(mu_k),
+                observed=y_obs,
+            )
+
+        else:
+            raise ValueError(
+                f"Unknown likelihood '{likelihood}' for KPI '{kpi}'. "
+                "Expected: gaussian, lognormal, negative_binomial, binomial."
+            )

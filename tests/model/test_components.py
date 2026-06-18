@@ -101,3 +101,108 @@ def test_media_hierarchy_variable_names():
     assert "scale_global" in names
     assert "scale_kpi_raw" in names
     assert "scale_geo_raw" in names
+
+
+# ---- Likelihoods ----
+
+def _kpi_meta(name, likelihood):
+    return pd.DataFrame([{"kpi": name, "likelihood": likelihood, "funnel_stage": None, "family": None}])
+
+
+def test_likelihood_gaussian():
+    T, G, K = 10, 2, 1
+    priors = PriorConfig()
+    obs = np.abs(np.random.default_rng(0).random((T, G, K))) * 1000 + 1
+    pop = np.full((T, G, K), np.nan)
+    kpi_meta = _kpi_meta("revenue", "gaussian")
+
+    with pm.Model() as model:
+        mu = pt.as_tensor_variable(np.log(obs))
+        _add_likelihood(mu, obs, pop, kpi_meta, ["revenue"], priors)
+        val = model.compile_fn(model.logp())(model.initial_point())
+    assert np.isfinite(val)
+
+
+def test_likelihood_lognormal():
+    T, G, K = 10, 2, 1
+    priors = PriorConfig()
+    obs = np.abs(np.random.default_rng(1).random((T, G, K))) * 100 + 1
+    pop = np.full((T, G, K), np.nan)
+    kpi_meta = _kpi_meta("revenue_ln", "lognormal")
+
+    with pm.Model() as model:
+        mu = pt.as_tensor_variable(np.log(obs))
+        _add_likelihood(mu, obs, pop, kpi_meta, ["revenue_ln"], priors)
+        val = model.compile_fn(model.logp())(model.initial_point())
+    assert np.isfinite(val)
+
+
+def test_likelihood_negative_binomial():
+    T, G, K = 10, 2, 1
+    priors = PriorConfig()
+    obs = np.round(np.abs(np.random.default_rng(2).random((T, G, K))) * 100) + 1
+    pop = np.full((T, G, K), np.nan)
+    kpi_meta = _kpi_meta("visits", "negative_binomial")
+
+    with pm.Model() as model:
+        mu = pt.as_tensor_variable(np.log(obs))
+        _add_likelihood(mu, obs, pop, kpi_meta, ["visits"], priors)
+        val = model.compile_fn(model.logp())(model.initial_point())
+    assert np.isfinite(val)
+
+
+def test_likelihood_binomial():
+    T, G, K = 5, 2, 1
+    priors = PriorConfig()
+    pop = np.full((T, G, K), 1000.0)
+    obs = np.round(pop * 0.05)
+    kpi_meta = _kpi_meta("rate_kpi", "binomial")
+
+    with pm.Model() as model:
+        mu = pt.as_tensor_variable(np.zeros((T, G, K)))
+        _add_likelihood(mu, obs, pop, kpi_meta, ["rate_kpi"], priors)
+        val = model.compile_fn(model.logp())(model.initial_point())
+    assert np.isfinite(val)
+
+
+def test_likelihood_binomial_requires_population():
+    T, G, K = 5, 2, 1
+    priors = PriorConfig()
+    obs = np.ones((T, G, K))
+    pop = np.full((T, G, K), np.nan)
+    kpi_meta = _kpi_meta("rate", "binomial")
+
+    with pm.Model():
+        mu = pt.as_tensor_variable(np.zeros((T, G, K)))
+        with pytest.raises(ValueError, match="population is NaN"):
+            _add_likelihood(mu, obs, pop, kpi_meta, ["rate"], priors)
+
+
+def test_likelihood_unknown_raises():
+    T, G, K = 5, 2, 1
+    priors = PriorConfig()
+    obs = np.ones((T, G, K))
+    pop = np.full((T, G, K), np.nan)
+    kpi_meta = _kpi_meta("foo", "poisson")
+
+    with pm.Model():
+        mu = pt.as_tensor_variable(np.zeros((T, G, K)))
+        with pytest.raises(ValueError, match="Unknown likelihood"):
+            _add_likelihood(mu, obs, pop, kpi_meta, ["foo"], priors)
+
+
+def test_likelihood_multi_kpi():
+    T, G, K = 10, 2, 2
+    priors = PriorConfig()
+    obs = np.abs(np.random.default_rng(3).random((T, G, K))) * 100 + 1
+    pop = np.full((T, G, K), np.nan)
+    kpi_meta = pd.DataFrame([
+        {"kpi": "visits", "likelihood": "negative_binomial", "funnel_stage": None, "family": None},
+        {"kpi": "revenue", "likelihood": "gaussian", "funnel_stage": None, "family": None},
+    ])
+
+    with pm.Model() as model:
+        mu = pt.as_tensor_variable(np.log(obs + 1))
+        _add_likelihood(mu, obs, pop, kpi_meta, ["visits", "revenue"], priors)
+        val = model.compile_fn(model.logp())(model.initial_point())
+    assert np.isfinite(val)
