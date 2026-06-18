@@ -206,3 +206,29 @@ def test_likelihood_multi_kpi():
         _add_likelihood(mu, obs, pop, kpi_meta, ["visits", "revenue"], priors)
         val = model.compile_fn(model.logp())(model.initial_point())
     assert np.isfinite(val)
+
+
+# ---- channel_contrib decomposition ----
+
+def test_channel_contrib_deterministic_registered():
+    """_build_media_hierarchy must register 'channel_contrib' as a pm.Deterministic."""
+    T, G, K, C = 5, 2, 4, 2
+    priors = PriorConfig()
+    X_sat_val = np.random.rand(T, G, C).astype("float64")
+
+    with pm.Model(coords=_base_coords()) as model:
+        _build_media_hierarchy(pt.as_tensor_variable(X_sat_val), priors)
+        det_names = {v.name for v in model.deterministics}
+    assert "channel_contrib" in det_names
+
+
+def test_channel_contrib_shape():
+    """channel_contrib must have shape [T, G, K, C]."""
+    T, G, K, C = 7, 2, 4, 2
+    priors = PriorConfig()
+    X_sat_val = np.random.rand(T, G, C).astype("float64")
+
+    with pm.Model(coords=_base_coords()) as model:
+        _build_media_hierarchy(pt.as_tensor_variable(X_sat_val), priors)
+        val = pm.draw(model["channel_contrib"], random_seed=0)
+    assert val.shape == (T, G, K, C)
