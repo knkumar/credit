@@ -174,7 +174,7 @@ class HierarchicalMMM:
             kwargs.setdefault("progressbar", False)
             with model:
                 trace = pm.sample(**kwargs)
-            return MMMFit(trace=trace, map_params=None, model=model, data=data)
+            return MMMFit(trace=trace, map_params=None, model=model, data=data, _mmm=self)
 
         elif mode == "vi":
             kwargs.setdefault("progressbar", False)
@@ -183,12 +183,12 @@ class HierarchicalMMM:
             with model:
                 approx = pm.fit(n=n, **kwargs)
                 trace = approx.sample(draws=200)
-            return MMMFit(trace=trace, map_params=None, model=model, data=data)
+            return MMMFit(trace=trace, map_params=None, model=model, data=data, _mmm=self)
 
         elif mode == "map":
             with model:
                 map_params = pm.find_MAP(**kwargs)
-            return MMMFit(trace=None, map_params=map_params, model=model, data=data)
+            return MMMFit(trace=None, map_params=map_params, model=model, data=data, _mmm=self)
 
         else:
             raise ValueError(
