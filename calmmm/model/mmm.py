@@ -142,3 +142,55 @@ class HierarchicalMMM:
 
         self._model = model
         return model
+
+    def fit(
+        self,
+        data: MMMData,
+        *,
+        mode: str = "sample",
+        **kwargs,
+    ) -> "MMMFit":
+        """
+        Build (if needed) and run inference on the model.
+
+        Parameters
+        ----------
+        data : MMMData
+        mode : "sample" | "vi" | "map"
+        **kwargs : passed to pm.sample / pm.fit / pm.find_MAP
+
+        Returns
+        -------
+        MMMFit
+        """
+        from calmmm.model.fit import MMMFit
+
+        if self._model is None or self._data is not data:
+            self.build_model(data)
+
+        model = self._model
+
+        if mode == "sample":
+            kwargs.setdefault("progressbar", False)
+            with model:
+                trace = pm.sample(**kwargs)
+            return MMMFit(trace=trace, map_params=None, model=model, data=data)
+
+        elif mode == "vi":
+            kwargs.setdefault("progressbar", False)
+            # Extract n before passing to pm.fit; don't forward it to approx.sample
+            n = kwargs.pop("n", 10000)
+            with model:
+                approx = pm.fit(n=n, **kwargs)
+                trace = approx.sample(draws=200)
+            return MMMFit(trace=trace, map_params=None, model=model, data=data)
+
+        elif mode == "map":
+            with model:
+                map_params = pm.find_MAP(**kwargs)
+            return MMMFit(trace=None, map_params=map_params, model=model, data=data)
+
+        else:
+            raise ValueError(
+                f"Unknown mode '{mode}'. Expected: 'sample', 'vi', 'map'."
+            )
