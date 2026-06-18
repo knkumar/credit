@@ -76,6 +76,7 @@ def test_build_model_obs_nodes_per_kpi(mmmdata):
 import arviz as az
 
 
+@pytest.mark.slow
 def test_fit_sample_returns_mmmfit(mmmdata):
     mmm = HierarchicalMMM()
     fit = mmm.fit(mmmdata, mode="sample", draws=50, tune=50, chains=1, progressbar=False, random_seed=42)
@@ -87,6 +88,7 @@ def test_fit_sample_returns_mmmfit(mmmdata):
     assert fit.data is mmmdata
 
 
+@pytest.mark.slow
 def test_fit_vi_returns_mmmfit(mmmdata):
     mmm = HierarchicalMMM()
     fit = mmm.fit(mmmdata, mode="vi", n=100, progressbar=False)
@@ -95,6 +97,7 @@ def test_fit_vi_returns_mmmfit(mmmdata):
     assert fit.trace is not None
 
 
+@pytest.mark.slow
 def test_fit_map_returns_mmmfit(mmmdata):
     mmm = HierarchicalMMM()
     fit = mmm.fit(mmmdata, mode="map")
@@ -110,6 +113,7 @@ def test_fit_invalid_mode_raises(mmmdata):
         mmm.fit(mmmdata, mode="invalid")
 
 
+@pytest.mark.slow
 def test_fit_reuses_built_model(mmmdata):
     mmm = HierarchicalMMM()
     model = mmm.build_model(mmmdata)
