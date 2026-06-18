@@ -3,6 +3,7 @@ import pymc as pm
 import pytest
 
 from calmmm.model.mmm import HierarchicalMMM
+from calmmm.model.fit import MMMFit
 from calmmm.model.priors import PriorConfig
 
 
@@ -119,3 +120,40 @@ def test_fit_reuses_built_model(mmmdata):
     model = mmm.build_model(mmmdata)
     fit = mmm.fit(mmmdata, mode="map")
     assert fit.model is model
+
+
+@pytest.mark.slow
+def test_fit_with_experiments_completes(mmmdata, lift_tests):
+    mmm = HierarchicalMMM(holdout_fraction=0.2)
+    fit = mmm.fit(mmmdata, experiments=lift_tests, mode="map")
+    assert isinstance(fit, MMMFit)
+
+
+@pytest.mark.slow
+def test_fit_with_experiments_has_calibration_targets(mmmdata, lift_tests):
+    mmm = HierarchicalMMM(holdout_fraction=0.2)
+    fit = mmm.fit(mmmdata, experiments=lift_tests, mode="map")
+    assert len(fit.calibration_targets) == 1
+    assert fit.calibration_targets[0].test_id == "search_holdout_q1"
+
+
+@pytest.mark.slow
+def test_fit_with_experiments_has_lift_obs_node(mmmdata, lift_tests):
+    mmm = HierarchicalMMM(holdout_fraction=0.2)
+    fit = mmm.fit(mmmdata, experiments=lift_tests, mode="map")
+    obs_names = {v.name for v in fit.model.observed_RVs}
+    assert "lift_obs_search_holdout_q1" in obs_names
+
+
+@pytest.mark.slow
+def test_fit_without_experiments_no_lift_nodes(mmmdata):
+    mmm = HierarchicalMMM(holdout_fraction=0.2)
+    fit = mmm.fit(mmmdata, mode="map")
+    obs_names = {v.name for v in fit.model.observed_RVs}
+    assert not any("lift_obs" in n for n in obs_names)
+    assert fit.calibration_targets == []
+
+
+def test_public_import_calibration_target():
+    from calmmm import CalibrationTarget
+    assert CalibrationTarget is not None

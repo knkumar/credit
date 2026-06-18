@@ -27,6 +27,7 @@ class MMMFit:
     model: pm.Model
     data: MMMData
     _mmm: Optional[Any] = field(default=None, repr=False)
+    calibration_targets: list = field(default_factory=list)
 
     def holdout_metrics(self) -> dict[str, float]:
         """
