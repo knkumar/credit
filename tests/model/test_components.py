@@ -61,3 +61,43 @@ def test_baseline_intercept_shape():
         fourier_beta_shape = tuple(model["fourier_beta"].shape.eval())
     assert intercept_shape == (K, G)
     assert fourier_beta_shape == (K, F)
+
+
+# ---- Media hierarchy ----
+
+def test_media_hierarchy_shape():
+    T, G, K, C = 10, 2, 4, 2
+    priors = PriorConfig()
+    X_sat_val = np.random.default_rng(0).random((T, G, C)).astype("float64")
+
+    with pm.Model(coords=_base_coords()) as model:
+        X_sat = pt.as_tensor_variable(X_sat_val)
+        contrib = _build_media_hierarchy(X_sat, priors)
+        val = pm.draw(contrib)
+    assert val.shape == (T, G, K)
+
+
+def test_media_hierarchy_logp_finite():
+    T, G, K, C = 5, 2, 4, 2
+    priors = PriorConfig()
+    X_sat_val = np.random.default_rng(1).random((T, G, C)).astype("float64")
+
+    with pm.Model(coords=_base_coords()) as model:
+        X_sat = pt.as_tensor_variable(X_sat_val)
+        _build_media_hierarchy(X_sat, priors)
+        lp_fn = model.compile_fn(model.logp())
+        val = lp_fn(model.initial_point())
+    assert np.isfinite(val)
+
+
+def test_media_hierarchy_variable_names():
+    T, G, K, C = 5, 2, 4, 2
+    priors = PriorConfig()
+    X_sat_val = np.random.default_rng(2).random((T, G, C)).astype("float64")
+
+    with pm.Model(coords=_base_coords()) as model:
+        _build_media_hierarchy(pt.as_tensor_variable(X_sat_val), priors)
+        names = {v.name for v in model.free_RVs}
+    assert "scale_global" in names
+    assert "scale_kpi_raw" in names
+    assert "scale_geo_raw" in names
