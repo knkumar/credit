@@ -73,7 +73,7 @@ def test_media_hierarchy_shape():
     with pm.Model(coords=_base_coords()) as model:
         X_sat = pt.as_tensor_variable(X_sat_val)
         contrib = _build_media_hierarchy(X_sat, priors)
-        val = pm.draw(contrib)
+        val = pm.draw(contrib, random_seed=0)
     assert val.shape == (T, G, K)
 
 
