@@ -91,7 +91,13 @@ def build_calibration_targets(
             )
 
         t_indices = np.array(window_filtered, dtype=int)
-        g_indices = np.array([g_idx[g] for g in exp.geo_scope if g in g_idx], dtype=int)
+        unknown_geos = [g for g in exp.geo_scope if g not in g_idx]
+        if unknown_geos:
+            raise ValueError(
+                f"Experiment '{exp.test_id}' references unknown geos: {unknown_geos}. "
+                f"Known geos: {sorted(g_idx.keys())}"
+            )
+        g_indices = np.array([g_idx[g] for g in exp.geo_scope], dtype=int)
         if len(g_indices) == 0:
             # If no specific geos matched, use all (national scope)
             g_indices = np.arange(len(geos), dtype=int)
