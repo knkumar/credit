@@ -178,7 +178,11 @@ class HierarchicalMMM:
         """
         from calmmm.model.fit import MMMFit
 
-        if self._model is None or self._data is not data:
+        if (
+            self._model is None
+            or self._data is not data
+            or (experiments is not None and not self._calibration_targets)
+        ):
             self.build_model(data, experiments=experiments)
 
         model = self._model
