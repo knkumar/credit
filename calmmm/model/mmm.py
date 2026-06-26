@@ -49,6 +49,10 @@ class HierarchicalMMM:
         self._pop_array: Optional[np.ndarray] = None
         self._calibration_targets: list = []
 
+    @property
+    def model(self) -> "Optional[pm.Model]":
+        return self._model
+
     def build_model(self, data: MMMData, experiments=None) -> pm.Model:
         """
         Construct the PyMC model for the given dataset.

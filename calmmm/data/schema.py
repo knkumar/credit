@@ -77,6 +77,7 @@ class ExperimentRow:
     calibration_likelihood: CalibrationLikelihood = CalibrationLikelihood.NORMAL
     student_t_nu: float = 5.0
     estimand: Estimand = Estimand.TOTAL
+    ci_level: float = 0.95  # confidence level for the reported CI; 0.95 → z≈1.96
 
     def __post_init__(self) -> None:
         if self.se is None:
@@ -88,6 +89,8 @@ class ExperimentRow:
                 raise ValueError(
                     f"ci_upper ({self.ci_upper}) must be >= ci_lower ({self.ci_lower})"
                 )
-            self.se = (self.ci_upper - self.ci_lower) / (2 * 1.96)
+            from scipy.stats import norm
+            z = norm.ppf((1 + self.ci_level) / 2)
+            self.se = (self.ci_upper - self.ci_lower) / (2 * z)
         if self.se <= 0:
             raise ValueError(f"se must be > 0, got {self.se}")

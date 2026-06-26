@@ -3,7 +3,7 @@ __all__ = [
     "MMMData", "IncrementalityTests",
     "HierarchicalMMM", "MMMFit",
     "CalibrationTarget",
-    "channel_contributions", "compute_roi", "saturation_curve",
+    "channel_contributions", "marginal_contributions", "compute_roi", "saturation_curve",
 ]
 
 
@@ -23,11 +23,12 @@ def __getattr__(name):
         from calmmm.calibration.targets import CalibrationTarget
         globals()["CalibrationTarget"] = CalibrationTarget
         return CalibrationTarget
-    if name in ("channel_contributions", "compute_roi", "saturation_curve"):
-        from calmmm.attribution.contributions import channel_contributions
+    if name in ("channel_contributions", "marginal_contributions", "compute_roi", "saturation_curve"):
+        from calmmm.attribution.contributions import channel_contributions, marginal_contributions
         from calmmm.attribution.roi import compute_roi
         from calmmm.attribution.curves import saturation_curve
         globals()["channel_contributions"] = channel_contributions
+        globals()["marginal_contributions"] = marginal_contributions
         globals()["compute_roi"] = compute_roi
         globals()["saturation_curve"] = saturation_curve
         return globals()[name]

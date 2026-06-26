@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 import pymc as pm
 
 from calmmm.data.containers import MMMData
+
+if TYPE_CHECKING:
+    from calmmm.model.mmm import HierarchicalMMM
 
 
 @dataclass
@@ -26,7 +29,7 @@ class MMMFit:
     map_params: Optional[dict]
     model: pm.Model
     data: MMMData
-    _mmm: Optional[Any] = field(default=None, repr=False)
+    _mmm: Optional["HierarchicalMMM"] = field(default=None, repr=False)
     calibration_targets: list = field(default_factory=list)
 
     def to_netcdf(self, path) -> None:

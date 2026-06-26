@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pandas as pd
 
 from calmmm.attribution.contributions import marginal_contributions
 
+if TYPE_CHECKING:
+    from calmmm.model.fit import MMMFit
 
-def compute_roi(fit) -> pd.DataFrame:
+
+def compute_roi(fit: "MMMFit") -> pd.DataFrame:
     """
     iROI per (KPI, channel) from a fitted MMMFit.
 
