@@ -118,12 +118,12 @@ class MMMFit:
                     _mmm=mmm,
                     calibration_targets=list(getattr(mmm, "_calibration_targets", [])),
                 )
-        except Exception:
+        except (ValueError, KeyError):
             pass
 
         # Fall back to MAP params stored as a plain xarray Dataset.
-        ds = _xr.open_dataset(path)
-        map_params = {k: ds[k].values for k in ds.data_vars}
+        with _xr.open_dataset(path) as ds:
+            map_params = {k: ds[k].values for k in ds.data_vars}
         return cls(
             trace=None,
             map_params=map_params,
