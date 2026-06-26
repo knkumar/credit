@@ -157,3 +157,30 @@ def test_fit_without_experiments_no_lift_nodes(mmmdata):
 def test_public_import_calibration_target():
     from calmmm import CalibrationTarget
     assert CalibrationTarget is not None
+
+
+def test_rebuild_guard_switches_from_calibrated_to_uncalibrated(mmmdata):
+    """
+    Verify that calling build_model(data, experiments=None) after a calibrated build
+    triggers a rebuild and resets calibration targets.
+
+    Regression test for: when experiments=None is passed on a second call after a
+    calibrated first call, the model should be rebuilt to remove calibration likelihood nodes.
+    """
+    mmm = HierarchicalMMM()
+    # Initial uncalibrated build
+    mmm.build_model(mmmdata, experiments=None)
+    assert mmm._calibration_targets == []
+
+    # Simulate a prior calibrated build by manually injecting targets
+    mmm._calibration_targets = ["sentinel_target"]
+    initial_model_id = id(mmm._model)
+
+    # Second call with experiments=None should trigger rebuild
+    # because experiments is None AND _calibration_targets is non-empty
+    mmm.build_model(mmmdata, experiments=None)
+
+    # After rebuild, targets should be reset to empty
+    assert mmm._calibration_targets == []
+    # Model object should be replaced (new build_model call)
+    assert id(mmm._model) != initial_model_id
