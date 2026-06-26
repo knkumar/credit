@@ -196,3 +196,48 @@ def test_rebuild_guard_switches_from_calibrated_to_uncalibrated(mmmdata):
     assert mmm._calibration_targets == []
     # Model object should be replaced (new build_model call)
     assert id(mmm._model) != initial_model_id
+
+
+def test_rebuild_guard_fit_calls_build_model_when_switching_to_uncalibrated(mmmdata):
+    """fit() must rebuild when experiments=None but calibration targets are set.
+
+    Verifies the rebuild guard condition in fit():
+        (experiments is None and bool(self._calibration_targets))
+
+    This test ensures fit() actually exercises the rebuild guard, not just
+    build_model() directly.
+    """
+    mmm = HierarchicalMMM(holdout_fraction=0.0)
+    mmm.build_model(mmmdata, experiments=None)
+    assert mmm._calibration_targets == []
+
+    # Simulate state from a prior calibrated fit
+    mmm._calibration_targets = ["sentinel"]
+    initial_model_id = id(mmm._model)
+
+    # Track build_model calls
+    build_calls = []
+    original_build = mmm.build_model
+
+    def tracking_build(data, experiments=None):
+        build_calls.append(experiments)
+        return original_build(data, experiments=experiments)
+
+    mmm.build_model = tracking_build
+
+    # fit() with experiments=None should trigger rebuild because _calibration_targets is set
+    # Mock PyMC inference to avoid actual computation
+    import unittest.mock as mock
+    with mock.patch("calmmm.model.mmm.pm.find_MAP", return_value={}):
+        with mock.patch("calmmm.model.fit.MMMFit") as mock_fit_cls:
+            mock_fit_cls.return_value = mock.MagicMock()
+            try:
+                mmm.fit(mmmdata, experiments=None, mode="map")
+            except Exception:
+                pass  # MMMFit mock may not construct cleanly; we only care about build_calls
+
+    # Verify build_model was called through fit()
+    assert len(build_calls) >= 1, "build_model should have been called when calibration_targets was non-empty"
+    assert build_calls[0] is None, "build_model should have been called with experiments=None"
+    # Model should have been rebuilt
+    assert id(mmm._model) != initial_model_id
