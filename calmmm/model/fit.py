@@ -57,6 +57,9 @@ class MMMFit:
         instance are intentionally NOT saved — they must be reconstructed
         by the caller via ``from_netcdf``.
 
+        Calibration targets are not saved; pass the original experiments to
+        ``from_netcdf`` (or ``HierarchicalMMM.fit()``) separately if needed.
+
         Parameters
         ----------
         path : str or Path
