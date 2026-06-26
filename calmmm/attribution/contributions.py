@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
+from calmmm.model.fit import eval_mu_and_channel_contrib as _eval_params
+
 if TYPE_CHECKING:
     from calmmm.model.fit import MMMFit
 
@@ -52,41 +54,49 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
 
     T, G, K, C = cc_val.shape
 
-    exp_mu = np.exp(mu_val)                  # [T, G, K]
-    cc_sum = cc_val.sum(axis=-1)             # [T, G, K]
-    baseline_contrib = np.exp(mu_val - cc_sum)  # [T, G, K] — counterfactual no-media outcome
-    total_media = exp_mu - baseline_contrib  # [T, G, K]
+    exp_mu = np.exp(mu_val)                   # [T, G, K]
+    cc_sum = cc_val.sum(axis=-1)              # [T, G, K]
+    baseline_contrib = np.exp(mu_val - cc_sum)  # [T, G, K]
+    total_media = exp_mu - baseline_contrib   # [T, G, K]
 
     # Guard against Σcc == 0 (no media spend → channel shares are undefined)
     safe_cc_sum = np.where(cc_sum == 0, 1.0, cc_sum)
 
-    rows = []
+    n_cells = T * G * K
 
-    for ti, t in enumerate(train_times):
-        for gi, g in enumerate(geos):
-            for ki, k in enumerate(kpis):
-                rows.append({
-                    "time": t, "geo": g, "kpi": k,
-                    "channel": "baseline",
-                    "contribution": float(baseline_contrib[ti, gi, ki]),
-                })
+    # Index arrays of length n_cells (row-major, matching array ravel order)
+    t_idx = np.repeat(np.arange(T), G * K)
+    g_idx = np.tile(np.repeat(np.arange(G), K), T)
+    k_idx = np.tile(np.tile(np.arange(K), G), T)
 
-    for ci, ch in enumerate(channels):
-        cc_c = cc_val[:, :, :, ci]  # [T, G, K]
-        contrib_c = np.where(
-            cc_sum == 0, 0.0,
-            total_media * cc_c / safe_cc_sum,
-        )  # [T, G, K]
-        for ti, t in enumerate(train_times):
-            for gi, g in enumerate(geos):
-                for ki, k in enumerate(kpis):
-                    rows.append({
-                        "time": t, "geo": g, "kpi": k,
-                        "channel": ch,
-                        "contribution": float(contrib_c[ti, gi, ki]),
-                    })
+    times_arr = np.array(train_times)
+    geos_arr = np.array(geos)
+    kpis_arr = np.array(kpis)
 
-    return pd.DataFrame(rows, columns=["time", "geo", "kpi", "channel", "contribution"])
+    all_times = np.tile(times_arr[t_idx], C + 1)
+    all_geos = np.tile(geos_arr[g_idx], C + 1)
+    all_kpis = np.tile(kpis_arr[k_idx], C + 1)
+
+    # Channel labels: "baseline" + one label per channel, each repeated n_cells times
+    channel_labels = np.repeat(np.array(["baseline"] + list(channels)), n_cells)
+
+    # Contribution values: baseline block then C channel blocks
+    baseline_flat = baseline_contrib.ravel()
+    channel_contribs = []
+    for ci in range(C):
+        cc_c = cc_val[:, :, :, ci]
+        contrib_c = np.where(cc_sum == 0, 0.0, total_media * cc_c / safe_cc_sum)
+        channel_contribs.append(contrib_c.ravel())
+
+    all_contributions = np.concatenate([baseline_flat] + channel_contribs)
+
+    return pd.DataFrame({
+        "time": all_times,
+        "geo": all_geos,
+        "kpi": all_kpis,
+        "channel": channel_labels,
+        "contribution": all_contributions,
+    })
 
 
 def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
@@ -117,34 +127,39 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
     kpis = data.kpis
     channels = data.channels
 
+    T, G, K, C = cc_val.shape
+
     exp_mu = np.exp(mu_val)  # [T, G, K]
 
-    rows = []
-    for ci, ch in enumerate(channels):
+    n_cells = T * G * K
+
+    # Index arrays (row-major, matching array ravel order)
+    t_idx = np.repeat(np.arange(T), G * K)
+    g_idx = np.tile(np.repeat(np.arange(G), K), T)
+    k_idx = np.tile(np.tile(np.arange(K), G), T)
+
+    times_arr = np.array(train_times)
+    geos_arr = np.array(geos)
+    kpis_arr = np.array(kpis)
+
+    all_times = np.tile(times_arr[t_idx], C)
+    all_geos = np.tile(geos_arr[g_idx], C)
+    all_kpis = np.tile(kpis_arr[k_idx], C)
+
+    channel_labels = np.repeat(np.array(list(channels)), n_cells)
+
+    channel_contribs = []
+    for ci in range(C):
         cc_c = cc_val[:, :, :, ci]
-        contrib_c = exp_mu - np.exp(mu_val - cc_c)  # [T, G, K]
-        for ti, t in enumerate(train_times):
-            for gi, g in enumerate(geos):
-                for ki, k in enumerate(kpis):
-                    rows.append({
-                        "time": t, "geo": g, "kpi": k,
-                        "channel": ch,
-                        "contribution": float(contrib_c[ti, gi, ki]),
-                    })
+        contrib_c = exp_mu - np.exp(mu_val - cc_c)
+        channel_contribs.append(contrib_c.ravel())
 
-    return pd.DataFrame(rows, columns=["time", "geo", "kpi", "channel", "contribution"])
+    all_contributions = np.concatenate(channel_contribs)
 
-
-def _eval_params(fit):
-    """Return (mu_val [T,G,K], cc_val [T,G,K,C]) as numpy arrays."""
-    if fit.map_params is not None:
-        return (
-            np.array(fit.map_params["mu"]),
-            np.array(fit.map_params["channel_contrib"]),
-        )
-    if fit.trace is not None:
-        return (
-            fit.trace.posterior["mu"].values.mean(axis=(0, 1)),
-            fit.trace.posterior["channel_contrib"].values.mean(axis=(0, 1)),
-        )
-    raise ValueError("MMMFit has neither map_params nor trace.")
+    return pd.DataFrame({
+        "time": all_times,
+        "geo": all_geos,
+        "kpi": all_kpis,
+        "channel": channel_labels,
+        "contribution": all_contributions,
+    })

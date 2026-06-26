@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from dataclasses import dataclass
 from typing import Optional
 
@@ -32,19 +33,19 @@ class MMMData:
     def n_times(self) -> int:
         return self.observations["time"].nunique()
 
-    @property
+    @functools.cached_property
     def channels(self) -> list[str]:
         return sorted(self.media["channel"].unique().tolist())
 
-    @property
+    @functools.cached_property
     def kpis(self) -> list[str]:
         return sorted(self.observations["kpi"].unique().tolist())
 
-    @property
+    @functools.cached_property
     def geos(self) -> list[str]:
         return sorted(self.observations["geo"].unique().tolist())
 
-    @property
+    @functools.cached_property
     def times(self) -> list[pd.Timestamp]:
         return sorted(self.observations["time"].unique().tolist())
 
