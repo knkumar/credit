@@ -27,8 +27,12 @@ def test_compute_roi_nrows(attr_map_fit):
 def test_compute_roi_total_spend_matches_data(attr_map_fit):
     fit = attr_map_fit
     df = compute_roi(fit)
+    train_times = set(
+        t for t, m in zip(fit.data.times, fit._mmm._train_mask) if m
+    )
+    media_train = fit.data.media[fit.data.media["time"].isin(train_times)]
     for ch in fit.data.channels:
-        expected_spend = fit.data.media[fit.data.media["channel"] == ch]["spend"].sum()
+        expected_spend = media_train[media_train["channel"] == ch]["spend"].sum()
         row = df[df["channel"] == ch]
         assert np.isclose(row["total_spend"].values[0], expected_spend, rtol=1e-6)
 
