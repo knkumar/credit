@@ -63,9 +63,24 @@ def add_calibration_likelihood(
         # Lift = sum of (factual outcome - counterfactual outcome) over window
         lift_model = (pt.exp(mu_exp) - pt.exp(mu_cf)).sum()
 
-        pm.Normal(
-            f"lift_obs_{target.test_id}",
-            mu=lift_model,
-            sigma=target.se,
-            observed=target.lift_obs,
-        )
+        cal_lik = target.calibration_likelihood
+        if cal_lik == "normal":
+            pm.Normal(
+                f"lift_obs_{target.test_id}",
+                mu=lift_model,
+                sigma=target.se,
+                observed=target.lift_obs,
+            )
+        elif cal_lik == "student_t":
+            pm.StudentT(
+                f"lift_obs_{target.test_id}",
+                nu=target.student_t_nu,
+                mu=lift_model,
+                sigma=target.se,
+                observed=target.lift_obs,
+            )
+        else:
+            raise NotImplementedError(
+                f"Calibration likelihood '{cal_lik}' is not yet implemented. "
+                "Supported: 'normal', 'student_t'."
+            )

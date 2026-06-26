@@ -6,7 +6,38 @@ from calmmm.model.coords import build_coords, build_arrays
 
 def test_build_coords_keys(mmmdata):
     coords = build_coords(mmmdata, n_fourier_pairs=2)
-    assert set(coords.keys()) == {"time", "geo", "kpi", "channel", "fourier"}
+    required = {"time", "geo", "kpi", "channel", "fourier"}
+    assert required.issubset(set(coords.keys()))
+
+
+def test_build_coords_includes_control_when_present(mmmdata):
+    coords = build_coords(mmmdata, n_fourier_pairs=2)
+    # conftest mmmdata has controls=["price_index"]
+    assert "control" in coords
+    assert coords["control"] == ["price_index"]
+
+
+def test_build_coords_no_control_key_when_no_controls():
+    import pandas as pd
+    from calmmm.data.containers import MMMData
+    import numpy as np
+    rng = np.random.default_rng(0)
+    T = 8
+    times = pd.date_range("2024-01-01", periods=T, freq="W")
+    obs = pd.DataFrame({
+        "time": times, "geo": "g1", "kpi": "rev",
+        "outcome": rng.uniform(1, 10, T), "population": np.nan,
+    })
+    media = pd.DataFrame({
+        "time": times, "geo": "g1", "channel": "tv",
+        "spend": rng.uniform(0, 5, T), "exposure": np.nan,
+    })
+    meta = pd.DataFrame({"kpi": ["rev"], "likelihood": ["gaussian"], "funnel_stage": [None], "family": [None]})
+    data = MMMData(observations=obs, media=media,
+                   controls=pd.DataFrame(columns=["time", "geo", "control", "value"]),
+                   kpi_metadata=meta)
+    coords = build_coords(data)
+    assert "control" not in coords
 
 
 def test_build_coords_fourier_length(mmmdata):

@@ -7,7 +7,8 @@ import pymc as pm
 import pytensor.tensor as pt
 
 from calmmm.data.containers import MMMData
-from calmmm.model.coords import build_coords, build_arrays
+from calmmm.data.validation import validate_mmmdata
+from calmmm.model.coords import build_coords, build_arrays, build_controls_array
 from calmmm.model.priors import PriorConfig
 from calmmm.model.transforms import geometric_adstock_pt, hill_saturation_pt
 from calmmm.model.components import _build_baseline, _build_media_hierarchy, _add_likelihood
@@ -43,6 +44,7 @@ class HierarchicalMMM:
         self._train_mask: Optional[np.ndarray] = None
         self._obs_array: Optional[np.ndarray] = None
         self._media_scaled: Optional[np.ndarray] = None
+        self._media_max: Optional[np.ndarray] = None
         self._fourier_matrix: Optional[np.ndarray] = None
         self._pop_array: Optional[np.ndarray] = None
         self._calibration_targets: list = []
@@ -65,14 +67,18 @@ class HierarchicalMMM:
         -------
         pm.Model
         """
+        validate_mmmdata(data).raise_if_errors()
+
         self._data = data
         coords = build_coords(data, n_fourier_pairs=self.n_fourier_pairs)
         obs_array, media_array, pop_array = build_arrays(data)
+        ctrl_array, _ctrl_names = build_controls_array(data)
 
         T = len(data.times)
 
         # Scale media per-channel by panel max
         media_max = media_array.max(axis=(0, 1), keepdims=True)  # [1, 1, C]
+        self._media_max = media_max.squeeze()  # [C] — per-channel panel max spend
         media_scaled = media_array / np.maximum(media_max, 1e-8)
 
         # Fourier features: t = 0-based week index
@@ -98,12 +104,14 @@ class HierarchicalMMM:
         self._media_scaled = media_scaled
         self._fourier_matrix = fourier_matrix
         self._pop_array = pop_array
+        self._ctrl_array = ctrl_array
 
         # Train slices
         X_media_train = media_scaled[train_mask]       # [T_train, G, C]
         fourier_train = fourier_matrix[train_mask]     # [T_train, F]
         obs_train = obs_array[train_mask]              # [T_train, G, K]
         pop_train = pop_array[train_mask]              # [T_train, G, K]
+        ctrl_train = ctrl_array[train_mask] if ctrl_array is not None else None  # [T_train, G, N] or None
 
         with pm.Model(coords=coords) as model:
             # Adstock params
@@ -129,7 +137,7 @@ class HierarchicalMMM:
             X_sat = hill_saturation_pt(X_adstocked, hill_alpha, hill_k)  # [T_train, G, C]
 
             # Baseline
-            baseline = _build_baseline(fourier_train, obs_mean_log, self.priors)
+            baseline = _build_baseline(fourier_train, obs_mean_log, self.priors, ctrl_train)
 
             # Media hierarchy
             media_contrib = _build_media_hierarchy(X_sat, self.priors)

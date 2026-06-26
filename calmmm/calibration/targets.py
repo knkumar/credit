@@ -38,6 +38,7 @@ class CalibrationTarget:
     se: float
     calibration_likelihood: str
     estimand: str
+    student_t_nu: float = 5.0
 
 
 def build_calibration_targets(
@@ -115,6 +116,7 @@ def build_calibration_targets(
                 se=exp.se,
                 calibration_likelihood=exp.calibration_likelihood.value,
                 estimand=exp.estimand.value,
+                student_t_nu=exp.student_t_nu,
             )
         )
 

@@ -25,3 +25,6 @@ class PriorConfig:
     # KPI dispersion
     sigma_sigma: float = 0.5        # Gaussian/LogNormal sigma
     nb_alpha_sigma: float = 1.0     # NegBin dispersion
+
+    # Control variables
+    controls_sigma: float = 1.0     # Normal sigma for control variable coefficients

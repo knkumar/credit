@@ -106,7 +106,8 @@ class MMMData:
             m_df.columns = ["time", "geo"]
             m_df["channel"] = ch_name
             m_df["spend"] = df[sp_col].values
-            m_df["exposure"] = df[exposure[idx]].values if exposure is not None else np.nan
+            exp_col = exposure[idx] if exposure is not None else None
+            m_df["exposure"] = df[exp_col].values if exp_col is not None else np.nan
             media_rows.append(m_df)
         media_df = pd.concat(media_rows, ignore_index=True)
 

@@ -23,7 +23,9 @@ def validate_mmmdata(dataset) -> ValidationResult:
     _check_duplicate_panel_rows(dataset, result)
     _check_negative_spend(dataset, result)
     _check_missing_outcomes(dataset, result)
+    _check_count_kpi_integrity(dataset, result)
     _check_binomial_kpi_has_population(dataset, result)
+    _check_binomial_not_exceeds_population(dataset, result)
     _check_weak_media_variation(dataset, result)
     return result
 
@@ -55,6 +57,23 @@ def _check_missing_outcomes(dataset, result: ValidationResult) -> None:
         )
 
 
+def _check_count_kpi_integrity(dataset, result: ValidationResult) -> None:
+    count_likelihoods = {"negative_binomial", "binomial"}
+    for _, row in dataset.kpi_metadata.iterrows():
+        if row["likelihood"] in count_likelihoods:
+            kpi = row["kpi"]
+            obs = dataset.observations.loc[
+                dataset.observations["kpi"] == kpi, "outcome"
+            ].dropna()
+            non_int_mask = obs % 1 != 0
+            if non_int_mask.any():
+                result.errors.append(
+                    f"KPI '{kpi}' has likelihood='{row['likelihood']}' but "
+                    f"{int(non_int_mask.sum())} non-integer outcome value(s) found. "
+                    "Count likelihoods require whole numbers."
+                )
+
+
 def _check_binomial_kpi_has_population(dataset, result: ValidationResult) -> None:
     binomial_kpis = dataset.kpi_metadata.loc[
         dataset.kpi_metadata["likelihood"] == "binomial", "kpi"
@@ -65,6 +84,21 @@ def _check_binomial_kpi_has_population(dataset, result: ValidationResult) -> Non
             result.warnings.append(
                 f"KPI '{kpi}' uses binomial likelihood but no population column "
                 f"was provided. Supply population= in from_dataframe()."
+            )
+
+
+def _check_binomial_not_exceeds_population(dataset, result: ValidationResult) -> None:
+    binomial_kpis = dataset.kpi_metadata.loc[
+        dataset.kpi_metadata["likelihood"] == "binomial", "kpi"
+    ].tolist()
+    for kpi in binomial_kpis:
+        kpi_obs = dataset.observations[dataset.observations["kpi"] == kpi]
+        valid = kpi_obs[kpi_obs["population"].notna() & kpi_obs["outcome"].notna()]
+        bad = valid[valid["outcome"] > valid["population"]]
+        if not bad.empty:
+            result.errors.append(
+                f"KPI '{kpi}' (binomial): {len(bad)} row(s) where "
+                f"outcome > population."
             )
 
 
