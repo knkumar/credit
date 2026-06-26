@@ -68,10 +68,16 @@ class MMMFit:
         full_model = full_mmm.build_model(mmm._data)
 
         if self.map_params is not None:
+            # Evaluate mu on the full-T model using the *trained* parameter values.
+            # model.initial_point() gives the key set for all free (latent) RVs in the
+            # transformed space — the same format find_MAP() returns.  Filtering
+            # map_params to these keys excludes deterministics (mu, channel_contrib,
+            # scale_kpi, …) which would cause "too many parameters" in compile_fn.
+            latent_init = full_model.initial_point()
+            latent_params = {k: self.map_params[k] for k in latent_init if k in self.map_params}
             with full_model:
-                map_full = pm.find_MAP(progressbar=False)
                 fn = full_model.compile_fn(full_model["mu"])
-                mu_val = fn(map_full)
+                mu_val = fn(latent_params)
             mu_holdout = np.array(mu_val)[holdout_mask]
 
         elif self.trace is not None:

@@ -11,9 +11,10 @@ def _build_baseline(
     fourier_matrix: np.ndarray,
     obs_mean_log: np.ndarray,
     priors: PriorConfig,
+    ctrl_array: np.ndarray | None = None,
 ) -> pt.TensorVariable:
     """
-    Baseline = per-(KPI, geo) intercept + Fourier seasonality.
+    Baseline = per-(KPI, geo) intercept + Fourier seasonality + optional controls.
 
     Parameters
     ----------
@@ -21,6 +22,7 @@ def _build_baseline(
     obs_mean_log : [K, G] numpy array — log(mean_outcome) per KPI×geo,
                    used as intercept prior mean (log scale)
     priors : PriorConfig
+    ctrl_array : [T, G, N_ctrl] float64 or None — standardised control values
 
     Returns
     -------
@@ -28,6 +30,7 @@ def _build_baseline(
 
     Must be called inside a pm.Model context with coords
     {"kpi": [...], "geo": [...], "fourier": [...]}.
+    When ctrl_array is provided the context must also have a "control" coord.
     """
     intercept = pm.Normal(
         "intercept",
@@ -45,7 +48,23 @@ def _build_baseline(
     intercept_tgk = intercept.T[None, :, :]
     # fourier_matrix [T, F] @ fourier_beta.T [F, K] → [T, K] → [T, 1, K]
     fourier_contrib = pt.dot(fourier_matrix, fourier_beta.T)[:, None, :]
-    return intercept_tgk + fourier_contrib  # [T, G, K]
+    baseline = intercept_tgk + fourier_contrib  # [T, G, K]
+
+    if ctrl_array is not None and ctrl_array.shape[-1] > 0:
+        beta_control = pm.Normal(
+            "beta_control",
+            mu=0.0,
+            sigma=priors.controls_sigma,
+            dims=("kpi", "control"),
+        )
+        # ctrl_array [T,G,N] → [T,G,1,N]; beta_control [K,N] → [1,1,K,N]
+        control_contrib = (
+            pt.as_tensor_variable(ctrl_array)[:, :, None, :]
+            * beta_control[None, None, :, :]
+        ).sum(axis=-1)  # [T, G, K]
+        baseline = baseline + control_contrib
+
+    return baseline
 
 
 def _build_media_hierarchy(
@@ -68,10 +87,15 @@ def _build_media_hierarchy(
     {"channel": [...], "kpi": [...], "geo": [...]}.
 
     Hierarchy:
-        scale_global[C] ~ HalfNormal
+        scale_global[C] ~ HalfNormal          — positive global channel scale
         scale_kpi[C, K] = scale_global + sigma_kpi * Normal(0,1)  (non-centered)
         scale_geo[C, K, G] = scale_kpi + sigma_geo * Normal(0,1)  (non-centered)
         contrib[t,g,k] = sum_c( X_sat[t,g,c] * scale_geo[c,k,g] )
+
+    scale_kpi and scale_geo can be negative: the KPI- and geo-level offsets are
+    unconstrained Normal, so a channel can have a negative net coefficient for a
+    specific KPI or geo when the data strongly support it (e.g. cannibalization,
+    budget displacement).  Downstream code must not assume positive contributions.
     """
     # Global channel scale
     scale_global = pm.HalfNormal(
