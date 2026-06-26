@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
+import pymc as pm
 from calmmm.attribution.roi import compute_roi
+from calmmm.model.fit import MMMFit
 
 
 @pytest.mark.slow
@@ -43,3 +45,9 @@ def test_compute_roi_finite(attr_map_fit):
     assert df["total_contribution"].notna().all()
     assert (df["total_spend"] > 0).all()
     assert df["roi"].notna().all()
+
+
+def test_compute_roi_raises_without_mmm():
+    fit = MMMFit(trace=None, map_params={}, model=pm.Model(), data=None, _mmm=None)
+    with pytest.raises(ValueError, match="_mmm is None"):
+        compute_roi(fit)
