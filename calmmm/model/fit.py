@@ -29,6 +29,110 @@ class MMMFit:
     _mmm: Optional[Any] = field(default=None, repr=False)
     calibration_targets: list = field(default_factory=list)
 
+    def to_netcdf(self, path) -> None:
+        """
+        Serialize the fit to a netCDF file.
+
+        If this is an MCMC/VI fit (trace is not None), saves the arviz
+        InferenceData.  If this is a MAP fit, saves map_params as a plain
+        xarray Dataset.  The PyMC model, MMMData, and HierarchicalMMM
+        instance are intentionally NOT saved — they must be reconstructed
+        by the caller via ``from_netcdf``.
+
+        Parameters
+        ----------
+        path : str or Path
+            Destination file path.
+
+        Raises
+        ------
+        ValueError
+            If both ``trace`` and ``map_params`` are None (nothing to save).
+        """
+        from pathlib import Path as _Path
+        import numpy as _np
+        import arviz as _az
+        import xarray as _xr
+
+        path = str(_Path(path))
+
+        if self.trace is not None:
+            _az.to_netcdf(self.trace, path)
+        elif self.map_params is not None:
+            # Use per-variable dimension names to avoid xarray alignment errors
+            # when variables have different sizes.
+            data_vars = {}
+            for k, v in self.map_params.items():
+                arr = _np.atleast_1d(v)
+                dims = [f"{k}_dim_{i}" for i in range(arr.ndim)]
+                data_vars[k] = _xr.DataArray(arr, dims=dims)
+            ds = _xr.Dataset(data_vars)
+            ds.to_netcdf(path)
+        else:
+            raise ValueError(
+                "MMMFit has nothing to save: both trace and map_params are None."
+            )
+
+    @classmethod
+    def from_netcdf(cls, path, data, mmm) -> "MMMFit":
+        """
+        Reconstruct an ``MMMFit`` from a netCDF file written by ``to_netcdf``.
+
+        Calls ``mmm.build_model(data)`` to re-instantiate the PyMC model
+        before returning.
+
+        Parameters
+        ----------
+        path : str or Path
+            File produced by ``to_netcdf``.
+        data : MMMData or None
+            The original training data.
+        mmm : HierarchicalMMM
+            A fresh ``HierarchicalMMM`` instance with the same configuration
+            used to produce the original fit.
+
+        Returns
+        -------
+        MMMFit
+        """
+        from pathlib import Path as _Path
+        import arviz as _az
+        import xarray as _xr
+
+        path = str(_Path(path))
+
+        # Reconstruct the PyMC model (required even for MAP fits so downstream
+        # methods that need self.model work correctly).
+        mmm.build_model(data)
+        model = getattr(mmm, "_model", None)
+
+        # Try loading as arviz InferenceData first.
+        try:
+            trace = _az.from_netcdf(path)
+            if hasattr(trace, "posterior"):
+                return cls(
+                    trace=trace,
+                    map_params=None,
+                    model=model,
+                    data=data,
+                    _mmm=mmm,
+                    calibration_targets=list(getattr(mmm, "_calibration_targets", [])),
+                )
+        except Exception:
+            pass
+
+        # Fall back to MAP params stored as a plain xarray Dataset.
+        ds = _xr.open_dataset(path)
+        map_params = {k: ds[k].values for k in ds.data_vars}
+        return cls(
+            trace=None,
+            map_params=map_params,
+            model=model,
+            data=data,
+            _mmm=mmm,
+            calibration_targets=list(getattr(mmm, "_calibration_targets", [])),
+        )
+
     def holdout_metrics(self) -> dict[str, float]:
         """
         Compute RMSE on the holdout time window (last holdout_fraction of T).
