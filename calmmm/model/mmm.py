@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 import numpy as np
 import pymc as pm
 import pytensor.tensor as pt
+
+logger = logging.getLogger(__name__)
 
 from calmmm.data.containers import MMMData
 from calmmm.data.validation import validate_mmmdata
@@ -99,6 +102,11 @@ class HierarchicalMMM:
             train_mask[-n_holdout:] = False
         self._train_mask = train_mask
 
+        logger.info(
+            "build_model: T=%d, G=%d, K=%d, C=%d, holdout=%d",
+            T, len(data.geos), len(data.kpis), len(data.channels), n_holdout,
+        )
+
         # Baseline intercept initialization: log(mean_outcome) per KPI×geo
         obs_mean = np.nanmean(obs_array, axis=0)  # [G, K]
         obs_mean_log = np.log(np.maximum(obs_mean.T, 1.0))  # [K, G]
@@ -189,6 +197,8 @@ class HierarchicalMMM:
         MMMFit
         """
         from calmmm.model.fit import MMMFit
+
+        logger.info("fit: mode=%s", mode)
 
         if (
             self._model is None

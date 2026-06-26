@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
+from calmmm.model.fit import eval_mu_and_channel_contrib as _eval_mu_and_channel_contrib
+
 if TYPE_CHECKING:
     from calmmm.calibration.targets import CalibrationTarget
     from calmmm.model.fit import MMMFit
+
+logger = logging.getLogger(__name__)
 
 
 def compute_model_lift(
@@ -35,6 +40,8 @@ def compute_model_lift(
     pd.DataFrame with columns: test_id, lift_model, lift_obs, se, z_score
     One row per target, empty DataFrame if targets is empty.
     """
+    logger.info("compute_model_lift: %d targets", len(targets))
+
     if not targets:
         return pd.DataFrame(columns=["test_id", "lift_model", "lift_obs", "se", "z_score"])
 
@@ -62,29 +69,3 @@ def compute_model_lift(
         })
 
     return pd.DataFrame(rows)
-
-
-def _eval_mu_and_channel_contrib(
-    fit: "MMMFit",
-) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Return (mu, channel_contrib) as numpy arrays [T_train, G, K] and [T_train, G, K, C].
-
-    For MAP: evaluates at map_params.
-    For MCMC/VI: returns posterior mean over chains and draws.
-    """
-    if fit.map_params is not None:
-        # pm.find_MAP() returns a dict that includes deterministic values
-        # alongside latent RVs — extract mu and channel_contrib directly.
-        mu_val = np.array(fit.map_params["mu"])
-        cc_val = np.array(fit.map_params["channel_contrib"])
-        return mu_val, cc_val
-
-    if fit.trace is not None:
-        # posterior["mu"]: [chains, draws, T_train, G, K]
-        mu_val = fit.trace.posterior["mu"].values.mean(axis=(0, 1))
-        # posterior["channel_contrib"]: [chains, draws, T_train, G, K, C]
-        cc_val = fit.trace.posterior["channel_contrib"].values.mean(axis=(0, 1))
-        return mu_val, cc_val
-
-    raise ValueError("MMMFit has neither map_params nor trace.")

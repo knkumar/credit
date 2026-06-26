@@ -12,6 +12,21 @@ if TYPE_CHECKING:
     from calmmm.model.mmm import HierarchicalMMM
 
 
+def eval_mu_and_channel_contrib(fit: "MMMFit"):
+    """Return (mu [T,G,K], channel_contrib [T,G,K,C]) as numpy arrays."""
+    if fit.map_params is not None:
+        return (
+            np.array(fit.map_params["mu"]),
+            np.array(fit.map_params["channel_contrib"]),
+        )
+    if fit.trace is not None:
+        return (
+            fit.trace.posterior["mu"].values.mean(axis=(0, 1)),
+            fit.trace.posterior["channel_contrib"].values.mean(axis=(0, 1)),
+        )
+    raise ValueError("MMMFit has neither map_params nor trace.")
+
+
 @dataclass
 class MMMFit:
     """
