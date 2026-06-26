@@ -4,8 +4,9 @@ from calmmm.attribution.contributions import channel_contributions, marginal_con
 
 
 def test_attribution_importable():
-    from calmmm import channel_contributions, compute_roi, saturation_curve
+    from calmmm import channel_contributions, marginal_contributions, compute_roi, saturation_curve
     assert callable(channel_contributions)
+    assert callable(marginal_contributions)
     assert callable(compute_roi)
     assert callable(saturation_curve)
 

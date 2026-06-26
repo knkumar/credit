@@ -154,6 +154,18 @@ def test_fit_without_experiments_no_lift_nodes(mmmdata):
     assert fit.calibration_targets == []
 
 
+def test_model_property_none_before_build():
+    mmm = HierarchicalMMM()
+    assert mmm.model is None
+
+
+def test_model_property_set_after_build(mmmdata):
+    import pymc as pm
+    mmm = HierarchicalMMM(holdout_fraction=0.0)
+    mmm.build_model(mmmdata)
+    assert isinstance(mmm.model, pm.Model)
+
+
 def test_public_import_calibration_target():
     from calmmm import CalibrationTarget
     assert CalibrationTarget is not None

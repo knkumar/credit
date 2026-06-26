@@ -109,6 +109,40 @@ def test_experiment_row_inverted_ci_raises():
         )
 
 
+def test_experiment_row_custom_ci_level():
+    from scipy.stats import norm
+    row_90 = ExperimentRow(
+        test_id="t_ci90",
+        channel_bundle=["search"],
+        kpi="visits",
+        geo_scope=["DMA_1"],
+        start_date=pd.Timestamp("2024-03-01"),
+        end_date=pd.Timestamp("2024-03-28"),
+        lift=12_000.0,
+        ci_lower=0.8,
+        ci_upper=1.2,
+        ci_level=0.90,
+    )
+    row_95 = ExperimentRow(
+        test_id="t_ci95",
+        channel_bundle=["search"],
+        kpi="visits",
+        geo_scope=["DMA_1"],
+        start_date=pd.Timestamp("2024-03-01"),
+        end_date=pd.Timestamp("2024-03-28"),
+        lift=12_000.0,
+        ci_lower=0.8,
+        ci_upper=1.2,
+        ci_level=0.95,
+    )
+    z90 = norm.ppf(0.95)
+    z95 = norm.ppf(0.975)
+    expected_se_90 = (1.2 - 0.8) / (2 * z90)
+    expected_se_95 = (1.2 - 0.8) / (2 * z95)
+    assert abs(row_90.se - expected_se_90) < 1e-10
+    assert abs(row_95.se - expected_se_95) < 1e-10
+
+
 def test_experiment_row_zero_se_raises():
     with pytest.raises(ValueError, match="se must be > 0"):
         ExperimentRow(
