@@ -5,6 +5,40 @@ from calmmm.model.mmm import HierarchicalMMM
 from calmmm.model.fit import MMMFit
 
 
+# ---------------------------------------------------------------------------
+# Fast serialization tests — no PyMC inference required
+# ---------------------------------------------------------------------------
+
+def test_to_netcdf_map_roundtrip(tmp_path):
+    """MAP params survive a to_netcdf / from_netcdf round-trip."""
+    map_params = {"mu": np.array([1.0, 2.0, 3.0]), "sigma": np.array([0.5])}
+    fit = MMMFit(trace=None, map_params=map_params, model=None, data=None, _mmm=None)
+
+    path = tmp_path / "map_fit.nc"
+    fit.to_netcdf(path)
+    assert path.exists()
+
+    class _FakeMMM:
+        _model = None
+        _calibration_targets = []
+
+        def build_model(self, data, experiments=None):
+            pass
+
+    loaded = MMMFit.from_netcdf(path, data=None, mmm=_FakeMMM())
+    assert loaded.trace is None
+    assert loaded.map_params is not None
+    assert np.allclose(loaded.map_params["mu"], map_params["mu"])
+    assert np.allclose(loaded.map_params["sigma"], map_params["sigma"])
+
+
+def test_to_netcdf_raises_when_nothing_to_save():
+    """to_netcdf raises ValueError when both trace and map_params are None."""
+    fit = MMMFit(trace=None, map_params=None, model=None, data=None, _mmm=None)
+    with pytest.raises(ValueError, match="nothing to save"):
+        fit.to_netcdf("/tmp/should_not_exist.nc")
+
+
 @pytest.fixture(scope="session")
 def map_fit(mmmdata):
     mmm = HierarchicalMMM(holdout_fraction=0.2)
