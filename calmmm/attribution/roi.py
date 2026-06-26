@@ -20,6 +20,12 @@ def compute_roi(fit) -> pd.DataFrame:
     total_spend is summed over training time steps only.
     total_contribution is the sum of marginal removals over training time steps.
     """
+    if fit._mmm is None:
+        raise ValueError(
+            "compute_roi() requires a MMMFit produced by HierarchicalMMM.fit(); "
+            "fit._mmm is None."
+        )
+
     contrib_df = marginal_contributions(fit)
 
     total_contrib = (
