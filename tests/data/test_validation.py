@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+import warnings as _warnings
 from calmmm.data.containers import MMMData
 from calmmm.data.validation import validate_mmmdata, ValidationResult
 
@@ -79,3 +80,23 @@ def test_validation_result_no_raise_when_clean(synthetic_panel):
     dataset = _make_dataset(synthetic_panel)
     result = validate_mmmdata(dataset)
     result.raise_if_errors()  # should not raise
+
+
+def test_raise_if_errors_emits_warnings():
+    result = ValidationResult(errors=[], warnings=["low variation in channel tv"])
+    with _warnings.catch_warnings(record=True) as caught:
+        _warnings.simplefilter("always")
+        result.raise_if_errors()
+    assert len(caught) == 1
+    assert "low variation" in str(caught[0].message)
+    assert caught[0].category is UserWarning
+
+
+def test_raise_if_errors_warns_then_raises():
+    result = ValidationResult(errors=["bad data"], warnings=["weak signal"])
+    with _warnings.catch_warnings(record=True) as caught:
+        _warnings.simplefilter("always")
+        with pytest.raises(ValueError):
+            result.raise_if_errors()
+    assert len(caught) == 1
+    assert "weak signal" in str(caught[0].message)

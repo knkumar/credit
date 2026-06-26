@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 
 
@@ -12,10 +13,13 @@ class ValidationResult:
     def has_errors(self) -> bool:
         return len(self.errors) > 0
 
-    def raise_if_errors(self) -> None:
+    def raise_if_errors(self) -> "ValidationResult":
+        for w in self.warnings:
+            warnings.warn(w, UserWarning, stacklevel=2)
         if self.has_errors:
             msg = "\n".join(f"  - {e}" for e in self.errors)
             raise ValueError(f"MMMData validation failed:\n{msg}")
+        return self
 
 
 def validate_mmmdata(dataset) -> ValidationResult:
