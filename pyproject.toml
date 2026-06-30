@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "calmmm"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "pymc>=5.0,<6",
+    "pytensor>=2.18,<3",
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "arviz>=0.16",
+    # llvmlite>=0.44 fails to build from source on this host; pin numba<0.61 to avoid it
+    "numba<0.61",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "pytest-cov>=4.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: marks tests that run PyMC inference (pm.sample/pm.find_MAP/pm.fit). Deselect with '-m not slow'",
+]
+addopts = "-m 'not slow'"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.0",
+    "pytest-cov>=7.1.0",
+]
