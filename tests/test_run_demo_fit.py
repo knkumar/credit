@@ -22,7 +22,7 @@ def test_default_parser_is_demo_first():
 
     assert args.mode == "map"
     assert args.weeks == 16
-    assert args.maxeval == 50
+    assert args.maxeval == 300
     assert args.holdout_fraction == 0.2
     assert args.adjust_lift_windows is True
     assert args.reporting_dir == Path("reporting")
@@ -82,6 +82,18 @@ def test_script_uses_attribution_spend_response_report():
     script = _load_script()
 
     assert script.spend_response_report is spend_response_report
+
+
+def test_demo_treats_applications_as_gaussian():
+    script = _load_script()
+
+    panel = pd.read_csv(script.DEFAULT_PANEL)
+    panel = script.select_week_subset(panel, weeks=2)
+    data = script.build_data(panel)
+
+    likelihoods = data.kpi_metadata.set_index("kpi")["likelihood"].to_dict()
+    assert likelihoods["applications"] == "gaussian"
+    assert likelihoods["funded_revenue"] == "gaussian"
 
 
 def test_write_outputs_includes_fit_quality_and_mcmc_diagnostics(tmp_path, monkeypatch):

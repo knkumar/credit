@@ -305,6 +305,8 @@ The demo also writes non-visual diagnostic tables under `artifacts/demo_fit/`:
 | `fit_quality.csv` | Training-window RMSE and R2 per KPI. R2 can be negative when the fitted mean is worse than using the KPI mean. |
 | `mcmc_diagnostics.csv` | `r_hat`, `ess_bulk`, and `ess_tail` for posterior parameters when the fit uses `mode="sample"` or `mode="vi"`. MAP fits write an empty table with the same columns because MAP has no posterior samples. |
 
+The packaged demo treats `applications` as a Gaussian KPI because the sample series is smooth and aggregated. For sparse or highly overdispersed count outcomes, prefer `negative_binomial`.
+
 ```python
 fit_quality = fit.fit_metrics()
 # dict: rmse_{kpi}, r2_{kpi}
