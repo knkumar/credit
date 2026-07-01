@@ -156,6 +156,14 @@ def fit_kwargs(args: argparse.Namespace) -> dict:
     }
 
 
+def fit_quality_table(metrics: dict[str, float], *, window: str = "train") -> pd.DataFrame:
+    rows = []
+    for name, value in metrics.items():
+        metric, kpi = name.split("_", 1)
+        rows.append({"metric": name, "kpi": kpi, "window": window, "value": value})
+    return pd.DataFrame(rows)
+
+
 def write_outputs(
     *,
     args: argparse.Namespace,
@@ -168,6 +176,8 @@ def write_outputs(
 
     roi = compute_roi(fit)
     calibration = compute_model_lift(fit, fit.calibration_targets)
+    fit_quality = fit_quality_table(fit.fit_metrics(), window="train")
+    diagnostics = fit.mcmc_diagnostics()
     contrib_sample = channel_contributions(fit).head(250)
     curves = pd.concat(
         [saturation_curve(fit, channel=channel, n_points=100) for channel in fit.data.channels],
@@ -183,6 +193,8 @@ def write_outputs(
 
     roi.to_csv(args.output_dir / "roi.csv", index=False)
     calibration.to_csv(args.output_dir / "calibration_fit.csv", index=False)
+    fit_quality.to_csv(args.output_dir / "fit_quality.csv", index=False)
+    diagnostics.to_csv(args.output_dir / "mcmc_diagnostics.csv", index=False)
     contrib_sample.to_csv(args.output_dir / "channel_contributions_sample.csv", index=False)
     curves.to_csv(args.reporting_dir / "saturation_curves.csv", index=False)
     response_report.to_csv(args.reporting_dir / "spend_response.csv", index=False)
@@ -197,6 +209,8 @@ def write_outputs(
         "outputs": {
             "roi": str(args.output_dir / "roi.csv"),
             "calibration": str(args.output_dir / "calibration_fit.csv"),
+            "fit_quality": str(args.output_dir / "fit_quality.csv"),
+            "mcmc_diagnostics": str(args.output_dir / "mcmc_diagnostics.csv"),
             "channel_contributions_sample": str(
                 args.output_dir / "channel_contributions_sample.csv"
             ),
@@ -213,6 +227,13 @@ def write_outputs(
     print(json.dumps(summary, indent=2))
     print("\nCalibration fit")
     print(calibration.to_string(index=False))
+    print("\nFit quality")
+    print(fit_quality.round(4).to_string(index=False))
+    print("\nMCMC diagnostics")
+    if diagnostics.empty:
+        print("No posterior diagnostics available for MAP fits.")
+    else:
+        print(diagnostics.round(3).to_string(index=False))
     print("\nROI")
     print(roi.round(3).to_string(index=False))
     print(f"\nSpend response for {args.spend_multiplier:.0%} spend scenario")

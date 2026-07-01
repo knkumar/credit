@@ -1,8 +1,10 @@
 import numpy as np
+import pandas as pd
 import pytest
+import arviz as az
 
 from calmmm.model.mmm import HierarchicalMMM
-from calmmm.model.fit import MMMFit
+from calmmm.model.fit import MMMFit, _regression_metrics
 
 
 # ---------------------------------------------------------------------------
@@ -37,6 +39,80 @@ def test_to_netcdf_raises_when_nothing_to_save():
     fit = MMMFit(trace=None, map_params=None, model=None, data=None, _mmm=None)
     with pytest.raises(ValueError, match="nothing to save"):
         fit.to_netcdf("/tmp/should_not_exist.nc")
+
+
+def test_regression_metrics_include_r2_per_kpi():
+    observed = np.array(
+        [
+            [[1.0, 10.0], [2.0, 20.0]],
+            [[3.0, 30.0], [4.0, 40.0]],
+        ]
+    )
+    predicted = np.array(
+        [
+            [[1.0, 12.0], [2.0, 18.0]],
+            [[3.0, 32.0], [5.0, 38.0]],
+        ]
+    )
+
+    metrics = _regression_metrics(observed, predicted, ["applications", "revenue"])
+
+    assert set(metrics) == {
+        "rmse_applications",
+        "r2_applications",
+        "rmse_revenue",
+        "r2_revenue",
+    }
+    assert metrics["rmse_applications"] == 0.5
+    assert round(metrics["r2_applications"], 6) == 0.8
+    assert 0.9 < metrics["r2_revenue"] < 1.0
+
+
+def test_mcmc_diagnostics_returns_empty_table_for_map_fit():
+    fit = MMMFit(trace=None, map_params={}, model=None, data=None, _mmm=None)
+
+    diagnostics = fit.mcmc_diagnostics()
+
+    assert list(diagnostics.columns) == ["parameter", "r_hat", "ess_bulk", "ess_tail"]
+    assert diagnostics.empty
+
+
+def test_mcmc_diagnostics_returns_arviz_summary_columns():
+    trace = az.from_dict(
+        posterior={
+            "adstock_decay": np.array([[[0.2, 0.3], [0.25, 0.35]], [[0.22, 0.32], [0.24, 0.34]]]),
+            "hill_alpha": np.array([[[1.0, 1.2], [1.1, 1.3]], [[0.9, 1.1], [1.0, 1.2]]]),
+        }
+    )
+    fit = MMMFit(trace=trace, map_params=None, model=None, data=None, _mmm=None)
+
+    diagnostics = fit.mcmc_diagnostics(var_names=["adstock_decay"])
+
+    assert isinstance(diagnostics, pd.DataFrame)
+    assert {"parameter", "r_hat", "ess_bulk", "ess_tail"}.issubset(diagnostics.columns)
+    assert diagnostics["parameter"].str.contains("adstock_decay").any()
+
+
+def test_fit_metrics_uses_training_predictions():
+    class _FakeData:
+        kpis = ["applications"]
+
+    class _FakeMMM:
+        _obs_array = np.array([[[10.0]], [[20.0]], [[30.0]]])
+        _train_mask = np.array([True, True, False])
+
+    fit = MMMFit(
+        trace=None,
+        map_params={"mu": np.log(np.array([[[12.0]], [[18.0]]])), "channel_contrib": np.zeros((2, 1, 1, 1))},
+        model=None,
+        data=_FakeData(),
+        _mmm=_FakeMMM(),
+    )
+
+    metrics = fit.fit_metrics()
+
+    assert metrics["rmse_applications"] == pytest.approx(2.0)
+    assert metrics["r2_applications"] == pytest.approx(0.84)
 
 
 @pytest.fixture(scope="session")
