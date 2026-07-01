@@ -23,6 +23,14 @@ REPORT_SPECS = {
         "path": ("artifacts", "calibration_fit.csv"),
         "metrics": ["lift_model", "lift_obs", "z_score"],
     },
+    "fit_quality": {
+        "path": ("artifacts", "fit_quality.csv"),
+        "metrics": ["value"],
+    },
+    "mcmc_diagnostics": {
+        "path": ("artifacts", "mcmc_diagnostics.csv"),
+        "metrics": ["r_hat", "ess_bulk", "ess_tail"],
+    },
 }
 
 
