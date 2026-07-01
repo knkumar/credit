@@ -46,6 +46,57 @@ def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50) -> pd.Data
     return pd.DataFrame({"spend": x, "saturation": saturation, "channel": channel})
 
 
+def spend_response_report(
+    fit: "MMMFit",
+    panel: pd.DataFrame,
+    *,
+    spend_columns: dict[str, str],
+    spend_multiplier: float = 1.10,
+    n_points: int = 100,
+) -> pd.DataFrame:
+    """
+    Summarize modeled saturation response for an increased-spend scenario.
+
+    Uses ``saturation_curve`` as the model-level primitive, then interpolates each
+    channel's fitted curve at current average spend and at
+    ``current_average_spend * spend_multiplier``.
+    """
+    rows = []
+    for channel in fit.data.channels:
+        spend_col = spend_columns.get(channel)
+        if spend_col is None or spend_col not in panel.columns:
+            continue
+
+        curve = saturation_curve(fit, channel=channel, n_points=n_points).sort_values("spend")
+        current_spend = float(panel[spend_col].mean())
+        increased_spend = current_spend * spend_multiplier
+        current_response = float(
+            np.interp(current_spend, curve["spend"], curve["saturation"])
+        )
+        increased_response = float(
+            np.interp(increased_spend, curve["spend"], curve["saturation"])
+        )
+        response_lift = increased_response - current_response
+        response_lift_pct = (
+            response_lift / current_response if current_response != 0 else np.nan
+        )
+
+        rows.append(
+            {
+                "channel": channel,
+                "spend_multiplier": spend_multiplier,
+                "current_spend": current_spend,
+                "increased_spend": increased_spend,
+                "current_response": current_response,
+                "increased_response": increased_response,
+                "response_lift": response_lift,
+                "response_lift_pct": response_lift_pct,
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
 def _eval_hill_params(fit):
     """Return (hill_alpha [C], hill_k [C]) as numpy arrays."""
     if fit.map_params is not None:
