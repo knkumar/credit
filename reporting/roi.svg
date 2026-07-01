@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+<rect width="100%" height="100%" fill="#ffffff" />
+<text x="24.0" y="38.0" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#111111">ROI by KPI and channel</text>
+<text x="24.0" y="94.3" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">funded_revenue / affili...</text>
+<rect x="170" y="72.0" width="742.0" height="34.2" fill="#ff6b35" />
+<text x="920.0" y="94.3" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">15.75</text>
+<text x="24.0" y="142.5" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">funded_revenue / social</text>
+<rect x="170" y="120.2" width="400.2" height="34.2" fill="#ff6b35" />
+<text x="578.2" y="142.5" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">8.50</text>
+<text x="24.0" y="190.8" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">funded_revenue / search</text>
+<rect x="170" y="168.5" width="340.1" height="34.2" fill="#ff6b35" />
+<text x="518.1" y="190.8" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">7.22</text>
+<text x="24.0" y="239.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">funded_revenue / direct...</text>
+<rect x="170" y="216.8" width="90.2" height="34.2" fill="#ff6b35" />
+<text x="268.2" y="239.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">1.91</text>
+<text x="24.0" y="287.3" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">applications / affiliate</text>
+<rect x="170" y="265.0" width="5.6" height="34.2" fill="#ff6b35" />
+<text x="183.6" y="287.3" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.12</text>
+<text x="24.0" y="335.5" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">applications / social</text>
+<rect x="170" y="313.2" width="3.2" height="34.2" fill="#ff6b35" />
+<text x="181.2" y="335.5" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.07</text>
+<text x="24.0" y="383.8" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">applications / direct_m...</text>
+<rect x="170" y="361.5" width="2.3" height="34.2" fill="#ff6b35" />
+<text x="180.3" y="383.8" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.05</text>
+<text x="24.0" y="432.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">applications / search</text>
+<rect x="170" y="409.8" width="2.1" height="34.2" fill="#ff6b35" />
+<text x="180.1" y="432.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.04</text>
+</svg>
