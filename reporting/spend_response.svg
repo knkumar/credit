@@ -1,16 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
 <rect width="100%" height="100%" fill="#ffffff" />
-<text x="24.0" y="38.0" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#111111">Spend response: modeled lift from increased spend</text>
-<text x="24.0" y="125.6" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">affiliate</text>
-<rect x="170" y="72.0" width="622.2" height="82.5" fill="#ff6b35" />
-<text x="800.2" y="125.6" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">1.35%</text>
-<text x="24.0" y="222.1" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">direct_mail</text>
-<rect x="170" y="168.5" width="412.7" height="82.5" fill="#ff6b35" />
-<text x="590.7" y="222.1" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.90%</text>
-<text x="24.0" y="318.6" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">search</text>
-<rect x="170" y="265.0" width="742.0" height="82.5" fill="#ff6b35" />
-<text x="920.0" y="318.6" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">1.61%</text>
-<text x="24.0" y="415.1" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">social</text>
-<rect x="170" y="361.5" width="641.2" height="82.5" fill="#ff6b35" />
-<text x="819.2" y="415.1" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">1.39%</text>
+<text x="24.0" y="38.0" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#111111">Spend scenario response by channel</text>
+<text x="24.0" y="64.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">Modeled saturation response change from a 10% spend increase.</text>
+<text x="280.0" y="94.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#111111">Response change (percentage points)</text>
+<text x="24.0" y="170.2" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">affiliate</text>
+<rect x="280" y="112.0" width="424.2" height="89.5" fill="#ff6b35" />
+<text x="712.2" y="170.2" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.66 pp</text>
+<text x="24.0" y="273.7" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">direct_mail</text>
+<rect x="280" y="215.5" width="278.7" height="89.5" fill="#ff6b35" />
+<text x="566.7" y="273.7" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.43 pp</text>
+<text x="24.0" y="377.2" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">search</text>
+<rect x="280" y="319.0" width="499.4" height="89.5" fill="#ff6b35" />
+<text x="787.4" y="377.2" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.78 pp</text>
+<text x="24.0" y="480.7" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">social</text>
+<rect x="280" y="422.5" width="432.6" height="89.5" fill="#ff6b35" />
+<text x="720.6" y="480.7" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.67 pp</text>
 </svg>

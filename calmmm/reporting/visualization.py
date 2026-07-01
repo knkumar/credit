@@ -114,13 +114,17 @@ def _resolve_report_path(parts: tuple[str, str], reporting_dir: Path, artifacts_
 
 def _render_spend_response(df: pd.DataFrame, out: Path) -> None:
     labels = df["channel"].astype(str).tolist()
-    values = (df["response_lift_pct"].astype(float) * 100.0).tolist()
+    values = (df["response_lift"].astype(float) * 100.0).tolist()
+    spend_multiplier = float(df["spend_multiplier"].iloc[0]) if "spend_multiplier" in df else 1.10
+    spend_increase_pct = (spend_multiplier - 1.0) * 100.0
     _write_bar_svg(
         out,
-        title="Spend response: modeled lift from increased spend",
+        title="Spend scenario response by channel",
+        subtitle=f"Modeled saturation response change from a {spend_increase_pct:.0f}% spend increase.",
         labels=labels,
         values=values,
-        value_suffix="%",
+        value_label="Response change (percentage points)",
+        value_suffix=" pp",
     )
 
 
@@ -132,10 +136,16 @@ def _render_saturation_curves(df: pd.DataFrame, out: Path) -> None:
             {
                 "label": str(channel),
                 "x": ordered["spend"].astype(float).tolist(),
-                "y": ordered["saturation"].astype(float).tolist(),
+                "y": (ordered["saturation"].astype(float) * 100.0).tolist(),
             }
         )
-    _write_line_svg(out, title="Fitted saturation curves", series=series)
+    _write_line_svg(
+        out,
+        title="Fitted saturation curves",
+        series=series,
+        x_label="Spend ($)",
+        y_label="Saturation (%)",
+    )
 
 
 def _render_roi(df: pd.DataFrame, out: Path) -> None:
@@ -147,8 +157,10 @@ def _render_roi(df: pd.DataFrame, out: Path) -> None:
     _write_bar_svg(
         out,
         title="ROI by KPI and channel",
+        subtitle="Marginal contribution per $1 of spend; higher values indicate stronger modeled return.",
         labels=grouped["label"].tolist(),
         values=grouped["roi"].astype(float).tolist(),
+        value_label="ROI (KPI units per $1 spend)",
         value_suffix="",
     )
 
@@ -160,8 +172,10 @@ def _render_calibration(df: pd.DataFrame, out: Path) -> None:
     _write_grouped_bar_svg(
         out,
         title="Calibration: modeled vs observed lift",
+        subtitle="Experiment lift comparison in the KPI's original outcome units.",
         labels=labels,
         series=[("modeled", model), ("observed", observed)],
+        value_label="Lift (KPI units)",
     )
 
 
@@ -169,23 +183,27 @@ def _write_bar_svg(
     out: Path,
     *,
     title: str,
+    subtitle: str,
     labels: list[str],
     values: list[float],
+    value_label: str,
     value_suffix: str,
 ) -> None:
-    width, height = 960, 540
-    margin_left, margin_top, margin_bottom = 170, 72, 96
-    chart_width = width - margin_left - 48
+    width, height = 1200, 600
+    margin_left, margin_top, margin_bottom, margin_right = 280, 112, 88, 180
+    chart_width = width - margin_left - margin_right
     chart_height = height - margin_top - margin_bottom
-    max_value = max([abs(v) for v in values] + [1.0])
+    max_value = max([abs(v) for v in values] + [1.0]) * 1.15
     bar_gap = 14
     bar_height = max(18, (chart_height - bar_gap * max(len(values) - 1, 0)) / max(len(values), 1))
 
     elements = [_svg_header(width, height, title)]
+    elements.append(_text(24, 64, subtitle, size=13))
+    elements.append(_text(margin_left, margin_top - 18, value_label, size=13, weight="700"))
     for idx, (label, value) in enumerate(zip(labels, values)):
         y = margin_top + idx * (bar_height + bar_gap)
         bar_width = chart_width * max(value, 0.0) / max_value
-        elements.append(_text(24, y + bar_height * 0.65, _truncate(label, 24), size=14))
+        elements.append(_text(24, y + bar_height * 0.65, _truncate(label, 38), size=14))
         elements.append(
             f'<rect x="{margin_left}" y="{y:.1f}" width="{bar_width:.1f}" '
             f'height="{bar_height:.1f}" fill="#ff6b35" />'
@@ -194,7 +212,7 @@ def _write_bar_svg(
             _text(
                 margin_left + bar_width + 8,
                 y + bar_height * 0.65,
-                f"{value:.2f}{value_suffix}",
+                f"{_format_number(value)}{value_suffix}",
                 size=13,
             )
         )
@@ -205,23 +223,27 @@ def _write_grouped_bar_svg(
     out: Path,
     *,
     title: str,
+    subtitle: str,
     labels: list[str],
     series: list[tuple[str, list[float]]],
+    value_label: str,
 ) -> None:
-    width, height = 960, 540
-    margin_left, margin_top, margin_bottom = 190, 84, 96
-    chart_width = width - margin_left - 48
+    width, height = 1200, 620
+    margin_left, margin_top, margin_bottom, margin_right = 280, 124, 88, 220
+    chart_width = width - margin_left - margin_right
     chart_height = height - margin_top - margin_bottom
-    max_value = max([abs(v) for _, values in series for v in values] + [1.0])
+    max_value = max([abs(v) for _, values in series for v in values] + [1.0]) * 1.15
     group_gap = 24
     group_height = max(42, (chart_height - group_gap * max(len(labels) - 1, 0)) / max(len(labels), 1))
     bar_height = group_height / max(len(series), 1) - 4
     colors = ["#ff6b35", "#111111", "#b8bcc4"]
 
     elements = [_svg_header(width, height, title)]
+    elements.append(_text(24, 64, subtitle, size=13))
+    elements.append(_text(margin_left, margin_top - 20, value_label, size=13, weight="700"))
     for idx, label in enumerate(labels):
         group_y = margin_top + idx * (group_height + group_gap)
-        elements.append(_text(24, group_y + group_height * 0.58, _truncate(label, 28), size=14))
+        elements.append(_text(24, group_y + group_height * 0.58, _truncate(label, 36), size=14))
         for s_idx, (name, values) in enumerate(series):
             value = values[idx]
             y = group_y + s_idx * (bar_height + 4)
@@ -230,22 +252,49 @@ def _write_grouped_bar_svg(
                 f'<rect x="{margin_left}" y="{y:.1f}" width="{bar_width:.1f}" '
                 f'height="{bar_height:.1f}" fill="{colors[s_idx % len(colors)]}" />'
             )
-            elements.append(_text(margin_left + bar_width + 8, y + bar_height * 0.72, f"{name}: {value:.0f}", size=12))
+            elements.append(
+                _text(
+                    margin_left + bar_width + 8,
+                    y + bar_height * 0.72,
+                    f"{name}: {_format_number(value, decimals=0)}",
+                    size=12,
+                )
+            )
     out.write_text("\n".join(elements + [_svg_footer()]), encoding="utf-8")
 
 
-def _write_line_svg(out: Path, *, title: str, series: list[dict]) -> None:
-    width, height = 960, 540
-    left, top, right, bottom = 72, 84, 48, 76
+def _write_line_svg(
+    out: Path,
+    *,
+    title: str,
+    series: list[dict],
+    x_label: str,
+    y_label: str,
+) -> None:
+    width, height = 1100, 620
+    left, top, right, bottom = 92, 112, 56, 112
     chart_width = width - left - right
     chart_height = height - top - bottom
     max_x = max([max(item["x"]) for item in series if item["x"]] + [1.0])
-    max_y = max([max(item["y"]) for item in series if item["y"]] + [1.0])
+    max_y = max(100.0, max([max(item["y"]) for item in series if item["y"]] + [1.0]))
     colors = ["#ff6b35", "#111111", "#6b7280", "#2563eb", "#287d3c"]
 
     elements = [_svg_header(width, height, title)]
+    elements.append(_text(24, 64, "Media response index by spend level. 0% = no response; 100% = fully saturated.", size=13))
+    elements.append(_text(left + chart_width * 0.42, height - 44, x_label, size=13, weight="700"))
+    elements.append(_text(16, top - 16, y_label, size=13, weight="700"))
     elements.append(f'<line x1="{left}" y1="{top + chart_height}" x2="{left + chart_width}" y2="{top + chart_height}" stroke="#b8bcc4" />')
     elements.append(f'<line x1="{left}" y1="{top}" x2="{left}" y2="{top + chart_height}" stroke="#b8bcc4" />')
+    for tick in _ticks(max_x, count=5):
+        x = left + chart_width * tick / max_x
+        elements.append(f'<line x1="{x:.1f}" y1="{top}" x2="{x:.1f}" y2="{top + chart_height}" stroke="#edf0f2" />')
+        elements.append(f'<line x1="{x:.1f}" y1="{top + chart_height}" x2="{x:.1f}" y2="{top + chart_height + 6}" stroke="#6b7280" />')
+        elements.append(_text(x - 20, top + chart_height + 24, _format_dollars(tick), size=11))
+    for tick in _ticks(max_y, count=5):
+        y = top + chart_height - chart_height * tick / max_y
+        elements.append(f'<line x1="{left}" y1="{y:.1f}" x2="{left + chart_width}" y2="{y:.1f}" stroke="#edf0f2" />')
+        elements.append(f'<line x1="{left - 6}" y1="{y:.1f}" x2="{left}" y2="{y:.1f}" stroke="#6b7280" />')
+        elements.append(_text(34, y + 4, f"{tick:.0f}%", size=11))
     for idx, item in enumerate(series):
         points = []
         for x_val, y_val in zip(item["x"], item["y"]):
@@ -288,6 +337,27 @@ def _truncate(text: str, max_len: int) -> str:
     if len(text) <= max_len:
         return text
     return text[: max_len - 1] + "..."
+
+
+def _ticks(max_value: float, *, count: int) -> list[float]:
+    if count <= 1:
+        return [0.0]
+    step = max_value / (count - 1)
+    return [idx * step for idx in range(count)]
+
+
+def _format_number(value: float, *, decimals: int = 2) -> str:
+    if decimals == 0:
+        return f"{value:,.0f}"
+    return f"{value:,.{decimals}f}"
+
+
+def _format_dollars(value: float) -> str:
+    if value >= 1_000_000:
+        return f"${value / 1_000_000:.1f}M"
+    if value >= 1_000:
+        return f"${value / 1_000:.0f}k"
+    return f"${value:.0f}"
 
 
 def _escape(text: str) -> str:
