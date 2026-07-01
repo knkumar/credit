@@ -48,7 +48,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--mode", choices=["map", "vi", "sample"], default="map")
     parser.add_argument("--holdout-fraction", type=float, default=0.2)
-    parser.add_argument("--maxeval", type=int, default=50, help="MAP maxeval.")
+    parser.add_argument("--maxeval", type=int, default=300, help="MAP maxeval.")
     parser.add_argument("--draws", type=int, default=200, help="MCMC draws.")
     parser.add_argument("--tune", type=int, default=200, help="MCMC tuning steps.")
     parser.add_argument("--chains", type=int, default=1, help="MCMC chains.")
@@ -123,7 +123,7 @@ def build_data(panel: pd.DataFrame) -> MMMData:
         controls=["price_index", "approval_rate_proxy"],
         population="population",
         kpi_likelihoods={
-            "applications": "negative_binomial",
+            "applications": "gaussian",
             "funded_revenue": "gaussian",
         },
     )
