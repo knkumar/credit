@@ -81,4 +81,5 @@ calmmm/
 ## Documentation
 
 - [User Guide](docs/USER_GUIDE.md) — full workflow with data prep, priors, calibration, and attribution.
+- [End-to-End Workflow](docs/END_TO_END_WORKFLOW.md) — flow and sequence diagrams connecting data, model, attribution, and reporting.
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) — production setup, batch jobs, monitoring.
