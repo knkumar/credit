@@ -57,6 +57,16 @@ roi = compute_roi(fit)
 print(roi)
 ```
 
+## Reporting Preview
+
+`calmmm` can render report-ready SVGs from demo or production fit outputs. The generated charts keep the model artifacts auditable while giving stakeholders a quick read on response curves, ROI, calibration fit, and spend scenarios.
+
+| Saturation curves | ROI by KPI and channel |
+|---|---|
+| ![Fitted saturation curves showing media response index by spend level](reporting/saturation_curves.svg) | ![ROI by KPI and channel](reporting/roi.svg) |
+
+See the [User Guide](docs/USER_GUIDE.md#6-reporting-visuals) for the full reporting workflow and additional plots.
+
 ## Tests
 
 ```bash
