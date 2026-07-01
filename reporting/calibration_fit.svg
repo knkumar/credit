@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+<rect width="100%" height="100%" fill="#ffffff" />
+<text x="24.0" y="38.0" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#111111">Calibration: modeled vs observed lift</text>
+<text x="24.0" y="181.4" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">search_geo_holdout_q2</text>
+<rect x="190" y="84.0" width="11.2" height="80.0" fill="#ff6b35" />
+<text x="209.2" y="141.6" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#111111">modeled: 12115</text>
+<rect x="190" y="168.0" width="1.1" height="80.0" fill="#111111" />
+<text x="199.1" y="225.6" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#111111">observed: 1180</text>
+<text x="24.0" y="373.4" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">direct_mail_match_q3</text>
+<rect x="190" y="276.0" width="257.5" height="80.0" fill="#ff6b35" />
+<text x="455.5" y="333.6" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#111111">modeled: 278201</text>
+<rect x="190" y="360.0" width="722.0" height="80.0" fill="#111111" />
+<text x="920.0" y="417.6" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#111111">observed: 780000</text>
+</svg>

@@ -1,0 +1,20 @@
+{
+  "mode": "map",
+  "weeks": 16,
+  "rows": 64,
+  "geos": [
+    "Midwest",
+    "Northeast",
+    "Southeast",
+    "West"
+  ],
+  "lift_tests": 2,
+  "map_param_count": 25,
+  "outputs": {
+    "roi": "artifacts/demo_fit/roi.csv",
+    "calibration": "artifacts/demo_fit/calibration_fit.csv",
+    "channel_contributions_sample": "artifacts/demo_fit/channel_contributions_sample.csv",
+    "saturation_curves": "reporting/saturation_curves.csv",
+    "spend_response": "reporting/spend_response.csv"
+  }
+}
