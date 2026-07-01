@@ -263,7 +263,42 @@ curve = saturation_curve(fit, channel="tv", n_points=100)
 
 ---
 
-## 6. Model evaluation
+## 6. Reporting visuals
+
+The demo workflow writes CSV report tables first, then renders SVG charts from those tables. This keeps the fit outputs reviewable before the visual layer is generated.
+
+```bash
+PYTENSOR_FLAGS='cxx=' uv run python scripts/run_demo_fit.py
+PYTENSOR_FLAGS='cxx=' uv run python -m calmmm.reporting.visualization
+```
+
+### Spend response
+
+Shows the modeled saturation response change, in percentage points, from the configured spend scenario. In the demo output the scenario is a 10% spend increase for each channel.
+
+![Spend scenario response by channel](../reporting/spend_response.svg)
+
+### Saturation curves
+
+Shows the fitted media response index by spend level. The y-axis is the saturation index: 0% means no modeled media response, and 100% means fully saturated response for that channel curve.
+
+![Fitted saturation curves](../reporting/saturation_curves.svg)
+
+### ROI
+
+Shows modeled marginal contribution per $1 of spend for each KPI and channel. ROI is computed from marginal counterfactual contributions, not the additive attribution table.
+
+![ROI by KPI and channel](../reporting/roi.svg)
+
+### Calibration fit
+
+Compares model-implied lift against observed lift tests in the KPI's original outcome units. Large gaps or large absolute z-scores indicate tension between the fitted MMM and the experiment evidence.
+
+![Calibration modeled vs observed lift](../reporting/calibration_fit.svg)
+
+---
+
+## 7. Model evaluation
 
 ### Holdout RMSE
 
@@ -286,7 +321,7 @@ Use this for visual posterior predictive checks — plot the training data again
 
 ---
 
-## 7. MCMC diagnostics
+## 8. MCMC diagnostics
 
 For MCMC fits, use ArviZ directly on `fit.trace`:
 
@@ -300,7 +335,7 @@ az.summary(fit.trace, var_names=["adstock_decay"])
 
 ---
 
-## 8. End-to-end example
+## 9. End-to-end example
 
 ```python
 import pandas as pd
