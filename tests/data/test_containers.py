@@ -251,6 +251,65 @@ def test_incrementality_tests_happy_path(synthetic_panel, synthetic_lift_df):
     assert experiments[0].se == 2_500.0
 
 
+def test_incrementality_tests_calibration_likelihood_literal_applies_to_all_rows(
+    synthetic_panel, synthetic_lift_df
+):
+    """When `calibration_likelihood` is not a column name, it's a literal applied to every row."""
+    dataset = MMMData.from_dataframe(
+        synthetic_panel,
+        time="week",
+        geo="dma",
+        kpis=["visits", "applications"],
+        media=["search", "social"],
+        spend=["search_spend", "social_spend"],
+    )
+    experiments = IncrementalityTests.from_dataframe(
+        synthetic_lift_df,
+        channel="channel",
+        kpi="kpi",
+        geo_scope="geo_scope",
+        start="start_date",
+        end="end_date",
+        lift="incremental_outcome",
+        standard_error="se",
+        calibration_likelihood="student_t",
+        mmmdata=dataset,
+    )
+    assert experiments[0].calibration_likelihood == CalibrationLikelihood.STUDENT_T
+
+
+def test_incrementality_tests_calibration_likelihood_reads_per_row_column(
+    synthetic_panel, synthetic_lift_df
+):
+    """When `calibration_likelihood` names a column in the dataframe, each row's own value is used."""
+    two_rows = pd.concat([synthetic_lift_df, synthetic_lift_df], ignore_index=True)
+    two_rows["test_id"] = ["search_holdout_q1", "search_holdout_q2"]
+    two_rows["calibration_likelihood"] = ["normal", "student_t"]
+
+    dataset = MMMData.from_dataframe(
+        synthetic_panel,
+        time="week",
+        geo="dma",
+        kpis=["visits", "applications"],
+        media=["search", "social"],
+        spend=["search_spend", "social_spend"],
+    )
+    experiments = IncrementalityTests.from_dataframe(
+        two_rows,
+        channel="channel",
+        kpi="kpi",
+        geo_scope="geo_scope",
+        start="start_date",
+        end="end_date",
+        lift="incremental_outcome",
+        standard_error="se",
+        calibration_likelihood="calibration_likelihood",
+        mmmdata=dataset,
+    )
+    assert experiments[0].calibration_likelihood == CalibrationLikelihood.NORMAL
+    assert experiments[1].calibration_likelihood == CalibrationLikelihood.STUDENT_T
+
+
 def test_incrementality_tests_unknown_channel_raises(synthetic_panel, synthetic_lift_df):
     dataset = MMMData.from_dataframe(
         synthetic_panel,
