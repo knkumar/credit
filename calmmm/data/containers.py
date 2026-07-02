@@ -179,10 +179,16 @@ class IncrementalityTests:
         ci_lower: Optional[str] = None,
         ci_upper: Optional[str] = None,
         calibration_likelihood: str = "normal",
-        student_t_nu: float = 5.0,
+        student_t_nu: float | str = 5.0,
         estimand: str = "total",
         mmmdata: Optional["MMMData"] = None,
     ) -> "IncrementalityTests":
+        def _per_row(value, row, cast):
+            """If `value` names a column in `df`, read it per-row; otherwise use it as a literal for every row."""
+            if isinstance(value, str) and value in df.columns:
+                return cast(row[value])
+            return value
+
         experiments = []
         for i, row in df.iterrows():
             se = float(row[standard_error]) if standard_error and standard_error in df.columns else None
@@ -216,9 +222,11 @@ class IncrementalityTests:
                 se=se,
                 ci_lower=ci_lo,
                 ci_upper=ci_hi,
-                calibration_likelihood=CalibrationLikelihood(calibration_likelihood),
-                student_t_nu=student_t_nu,
-                estimand=Estimand(estimand),
+                calibration_likelihood=CalibrationLikelihood(
+                    _per_row(calibration_likelihood, row, str)
+                ),
+                student_t_nu=_per_row(student_t_nu, row, float),
+                estimand=Estimand(_per_row(estimand, row, str)),
             )
 
             if mmmdata is not None:
