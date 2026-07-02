@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
+import pandas as pd
 import pymc as pm
 
 from calmmm.data.containers import MMMData
@@ -25,6 +26,24 @@ def eval_mu_and_channel_contrib(fit: "MMMFit"):
             fit.trace.posterior["channel_contrib"].values.mean(axis=(0, 1)),
         )
     raise ValueError("MMMFit has neither map_params nor trace.")
+
+
+def _regression_metrics(
+    observed: np.ndarray,
+    predicted: np.ndarray,
+    kpis: list[str],
+) -> dict[str, float]:
+    metrics: dict[str, float] = {}
+    for k, kpi in enumerate(kpis):
+        y_true = observed[:, :, k].ravel()
+        y_pred = predicted[:, :, k].ravel()
+        residual = y_true - y_pred
+        sse = float(np.sum(residual**2))
+        centered = y_true - float(np.mean(y_true))
+        sst = float(np.sum(centered**2))
+        metrics[f"rmse_{kpi}"] = float(np.sqrt(np.mean(residual**2)))
+        metrics[f"r2_{kpi}"] = float(1.0 - sse / sst) if sst > 0 else np.nan
+    return metrics
 
 
 @dataclass
@@ -222,13 +241,53 @@ class MMMFit:
         # mu is on log scale → exp to get predicted mean
         pred_mean = np.exp(mu_holdout)  # [T_holdout, G, K]
 
-        kpis = mmm._data.kpis
-        return {
-            f"rmse_{kpi}": float(np.sqrt(np.mean(
-                (obs_holdout[:, :, k].ravel() - pred_mean[:, :, k].ravel()) ** 2
-            )))
-            for k, kpi in enumerate(kpis)
-        }
+        return _regression_metrics(obs_holdout, pred_mean, mmm._data.kpis)
+
+    def fit_metrics(self) -> dict[str, float]:
+        """
+        Compute training-window RMSE and R2 from fitted mean predictions.
+
+        This evaluates the model on the same time window used by the likelihood.
+        It is intended as a lightweight goodness-of-fit summary for reporting.
+        Use ``holdout_metrics()`` separately when a holdout-specific score is
+        required.
+        """
+        mmm = self._mmm
+        if mmm is None or mmm._train_mask is None:
+            raise ValueError("fit_metrics() requires a model built via HierarchicalMMM.fit()")
+
+        mu, _channel_contrib = eval_mu_and_channel_contrib(self)
+        observed = mmm._obs_array[mmm._train_mask]
+        predicted = np.exp(mu)
+        return _regression_metrics(observed, predicted, self.data.kpis)
+
+    def mcmc_diagnostics(self, var_names: list[str] | None = None) -> pd.DataFrame:
+        """
+        Return compact MCMC diagnostics for posterior parameters.
+
+        MAP fits do not have posterior samples, so this returns an empty table
+        with stable columns. For MCMC/VI fits, the table includes ArviZ R-hat
+        and effective sample size diagnostics where available.
+        """
+        columns = ["parameter", "r_hat", "ess_bulk", "ess_tail"]
+        if self.trace is None:
+            return pd.DataFrame(columns=columns)
+
+        import arviz as az
+
+        default_vars = ["adstock_decay", "hill_alpha", "hill_k"]
+        requested = var_names or [
+            name for name in default_vars if name in self.trace.posterior
+        ]
+        if not requested:
+            return pd.DataFrame(columns=columns)
+
+        summary = az.summary(self.trace, var_names=requested, kind="diagnostics")
+        diagnostics = summary.reset_index(names="parameter")
+        for column in columns:
+            if column not in diagnostics.columns:
+                diagnostics[column] = np.nan
+        return diagnostics[columns]
 
     def posterior_predictive(self) -> dict[str, np.ndarray]:
         """

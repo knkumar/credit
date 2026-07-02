@@ -60,6 +60,7 @@ print(roi)
 ## Reporting Preview
 
 `calmmm` can render report-ready SVGs from demo or production fit outputs. The generated charts keep the model artifacts auditable while giving stakeholders a quick read on response curves, ROI, calibration fit, and spend scenarios.
+The same demo output includes `fit_quality.csv` with RMSE/R2 and `mcmc_diagnostics.csv` with R-hat/ESS diagnostics for posterior fits.
 
 | Saturation curves | ROI by KPI and channel |
 |---|---|

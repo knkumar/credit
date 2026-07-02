@@ -111,7 +111,9 @@ Expected output files:
 artifacts/demo_fit/
   calibration_fit.csv
   channel_contributions_sample.csv
+  fit_quality.csv
   fit_summary.json
+  mcmc_diagnostics.csv
   roi.csv
 
 reporting/
