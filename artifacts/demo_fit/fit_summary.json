@@ -13,6 +13,8 @@
   "outputs": {
     "roi": "artifacts/demo_fit/roi.csv",
     "calibration": "artifacts/demo_fit/calibration_fit.csv",
+    "fit_quality": "artifacts/demo_fit/fit_quality.csv",
+    "mcmc_diagnostics": "artifacts/demo_fit/mcmc_diagnostics.csv",
     "channel_contributions_sample": "artifacts/demo_fit/channel_contributions_sample.csv",
     "saturation_curves": "reporting/saturation_curves.csv",
     "spend_response": "reporting/spend_response.csv"

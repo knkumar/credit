@@ -296,16 +296,45 @@ Compares model-implied lift against observed lift tests in the KPI's original ou
 
 ![Calibration modeled vs observed lift](../reporting/calibration_fit.svg)
 
+### Fit quality and diagnostics tables
+
+The demo also writes non-visual diagnostic tables under `artifacts/demo_fit/`:
+
+| File | Contents |
+|---|---|
+| `fit_quality.csv` | Training-window RMSE and R2 per KPI. R2 can be negative when the fitted mean is worse than using the KPI mean. |
+| `mcmc_diagnostics.csv` | `r_hat`, `ess_bulk`, and `ess_tail` for posterior parameters when the fit uses `mode="sample"` or `mode="vi"`. MAP fits write an empty table with the same columns because MAP has no posterior samples. |
+
+The packaged demo treats `applications` as a Gaussian KPI because the sample series is smooth and aggregated. For sparse or highly overdispersed count outcomes, prefer `negative_binomial`.
+
+```python
+fit_quality = fit.fit_metrics()
+# dict: rmse_{kpi}, r2_{kpi}
+
+mcmc_diagnostics = fit.mcmc_diagnostics()
+# DataFrame: parameter, r_hat, ess_bulk, ess_tail
+```
+
 ---
 
 ## 7. Model evaluation
 
-### Holdout RMSE
+### Training fit metrics
+
+```python
+metrics = fit.fit_metrics()
+# dict: rmse_{kpi}, r2_{kpi} for the training window
+# e.g. {"rmse_revenue": 12450.3, "r2_revenue": 0.82}
+```
+
+Training R2 is a goodness-of-fit summary, not causal evidence. Use it to catch obvious fit problems, compare model specifications, and decide where posterior predictive checks need closer inspection.
+
+### Holdout RMSE and R2
 
 ```python
 metrics = fit.holdout_metrics()
-# dict: rmse_{kpi} for each KPI
-# e.g. {"rmse_revenue": 12450.3, "rmse_orders": 87.2}
+# dict: rmse_{kpi}, r2_{kpi} for each KPI
+# e.g. {"rmse_revenue": 12450.3, "r2_revenue": 0.72}
 ```
 
 The holdout window is the last `holdout_fraction` of time steps, excluded from the likelihood during fitting.
@@ -323,7 +352,12 @@ Use this for visual posterior predictive checks — plot the training data again
 
 ## 8. MCMC diagnostics
 
-For MCMC fits, use ArviZ directly on `fit.trace`:
+For MCMC fits, use the compact diagnostics table or ArviZ directly on `fit.trace`:
+
+```python
+diagnostics = fit.mcmc_diagnostics()
+# DataFrame: parameter, r_hat, ess_bulk, ess_tail
+```
 
 ```python
 import arviz as az

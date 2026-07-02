@@ -3,3 +3,5 @@ spend_response,reporting/spend_response.csv,4,8,"response_lift,response_lift_pct
 saturation_curves,reporting/saturation_curves.csv,400,3,saturation
 roi,artifacts/demo_fit/roi.csv,8,5,"roi,total_contribution,total_spend"
 calibration_fit,artifacts/demo_fit/calibration_fit.csv,2,5,"lift_model,lift_obs,z_score"
+fit_quality,artifacts/demo_fit/fit_quality.csv,4,4,value
+mcmc_diagnostics,artifacts/demo_fit/mcmc_diagnostics.csv,0,4,"r_hat,ess_bulk,ess_tail"

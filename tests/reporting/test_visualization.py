@@ -45,6 +45,21 @@ def _write_inputs(reporting_dir: Path, artifacts_dir: Path) -> None:
             "z_score": [1.0, -2.87],
         }
     ).to_csv(artifacts_dir / "calibration_fit.csv", index=False)
+    pd.DataFrame(
+        {
+            "metric": ["rmse_applications", "r2_applications"],
+            "kpi": ["applications", "applications"],
+            "value": [123.0, 0.82],
+        }
+    ).to_csv(artifacts_dir / "fit_quality.csv", index=False)
+    pd.DataFrame(
+        {
+            "parameter": ["adstock_decay[search]"],
+            "r_hat": [1.01],
+            "ess_bulk": [250.0],
+            "ess_tail": [200.0],
+        }
+    ).to_csv(artifacts_dir / "mcmc_diagnostics.csv", index=False)
 
 
 def test_build_summary_table_describes_reports(tmp_path):
@@ -59,6 +74,8 @@ def test_build_summary_table_describes_reports(tmp_path):
         "saturation_curves",
         "roi",
         "calibration_fit",
+        "fit_quality",
+        "mcmc_diagnostics",
     }
     assert summary.set_index("report").loc["spend_response", "rows"] == 3
     assert "response_lift_pct" in summary.set_index("report").loc["spend_response", "metric_columns"]
@@ -97,6 +114,9 @@ def test_render_reporting_outputs_labels_plot_units(tmp_path):
     assert "Saturation (%)" in (reporting_dir / "saturation_curves.svg").read_text()
     assert "ROI (KPI units per $1 spend)" in (reporting_dir / "roi.svg").read_text()
     assert "Lift (KPI units)" in (reporting_dir / "calibration_fit.svg").read_text()
+
+    summary = pd.read_csv(reporting_dir / "summary_table.csv")
+    assert {"fit_quality", "mcmc_diagnostics"}.issubset(set(summary["report"]))
 
 
 def test_render_reporting_outputs_keeps_labels_and_ticks_readable(tmp_path):
