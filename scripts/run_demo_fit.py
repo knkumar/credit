@@ -136,6 +136,11 @@ def build_data(panel: pd.DataFrame) -> MMMData:
 
 
 def build_experiments(lift_tests: pd.DataFrame, data: MMMData) -> IncrementalityTests:
+    kwargs = {}
+    if "calibration_likelihood" in lift_tests.columns:
+        kwargs["calibration_likelihood"] = "calibration_likelihood"
+    if "estimand" in lift_tests.columns:
+        kwargs["estimand"] = "estimand"
     return IncrementalityTests.from_dataframe(
         lift_tests,
         channel="channel",
@@ -146,6 +151,7 @@ def build_experiments(lift_tests: pd.DataFrame, data: MMMData) -> Incrementality
         lift="incremental_outcome",
         standard_error="se",
         mmmdata=data,
+        **kwargs,
     )
 
 
