@@ -1,5 +1,5 @@
 metric,kpi,window,value
-rmse_applications,applications,train,105.66808376398491
-r2_applications,applications,train,0.4767752838717584
-rmse_funded_revenue,funded_revenue,train,17606.48872621812
-r2_funded_revenue,funded_revenue,train,0.9693072278321146
+rmse_applications,applications,train,29.844862261363136
+r2_applications,applications,train,0.9661770141423207
+rmse_funded_revenue,funded_revenue,train,19413.9524218737
+r2_funded_revenue,funded_revenue,train,0.9727709895689689

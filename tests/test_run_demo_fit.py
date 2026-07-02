@@ -21,10 +21,10 @@ def test_default_parser_is_demo_first():
     args = script.parse_args([])
 
     assert args.mode == "map"
-    assert args.weeks == 16
-    assert args.maxeval == 300
+    assert args.weeks == 0
+    assert args.maxeval == 2000
     assert args.holdout_fraction == 0.2
-    assert args.adjust_lift_windows is True
+    assert args.adjust_lift_windows is False
     assert args.reporting_dir == Path("reporting")
     assert args.spend_multiplier == 1.10
 
