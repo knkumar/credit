@@ -8,6 +8,97 @@ For a diagrammed view of how data preparation, fitting, attribution, and reporti
 
 ---
 
+## Model structure
+
+Plate notation for `HierarchicalMMM.build_model()` (`calmmm/model/mmm.py`, `calmmm/model/components.py`). Circles are random variables, shaded circles are observed data, rectangles are deterministic transforms. Nested boxes are plates — a box labeled `x ∈ X (N)` means the contents repeat once per element of `X`.
+
+```mermaid
+flowchart TB
+    classDef rv fill:#ffffff,stroke:#333,stroke-width:1.5px
+    classDef obs fill:#d8d8d8,stroke:#333,stroke-width:1.5px
+    classDef det fill:#ffffff,stroke:#999,stroke-dasharray:3 3
+
+    subgraph PLATE_C["channel c &isin; C (4)"]
+        decay(("decay[c]<br/>Beta(&alpha;<sub>ad</sub>,&beta;<sub>ad</sub>)")):::rv
+        hillA(("hill_alpha[c]<br/>HalfNormal(&sigma;<sub>h&alpha;</sub>)")):::rv
+        hillK(("hill_k[c]<br/>HalfNormal(&sigma;<sub>hk</sub>)")):::rv
+        scaleG(("scale_global[c]<br/>HalfNormal(&sigma;<sub>g</sub>)")):::rv
+
+        subgraph PLATE_CK["kpi k &isin; K (2)"]
+            scaleKPI(("scale_kpi[c,k]<br/>Normal(scale_global[c], &sigma;<sub>kpi</sub>[c])")):::rv
+
+            subgraph PLATE_CKG["geo g &isin; G (4)"]
+                scaleGeo(("scale_geo[c,k,g]<br/>Normal(scale_kpi[c,k], &sigma;<sub>geo</sub>[c])")):::rv
+            end
+        end
+    end
+
+    subgraph PLATE_KG["kpi k, geo g"]
+        intercept(("intercept[k,g]<br/>Normal(log mean_y[k,g], &sigma;<sub>base</sub>)")):::rv
+    end
+
+    subgraph PLATE_KF["kpi k, fourier f &isin; F"]
+        fbeta(("fourier_beta[k,f]<br/>Normal(0, &sigma;<sub>season</sub>)")):::rv
+    end
+
+    subgraph PLATE_KN["kpi k, control n &isin; N (optional)"]
+        bctrl(("beta_control[k,n]<br/>Normal(0, &sigma;<sub>ctrl</sub>)")):::rv
+    end
+
+    subgraph PLATE_TGC["time t, geo g, channel c"]
+        spend(("spend[t,g,c]")):::obs
+        adstock["X_adstock[t,g,c] =<br/>spend[t,g,c] + decay[c]&middot;X_adstock[t-1,g,c]"]:::det
+        sat["X_sat[t,g,c] =<br/>Hill(X_adstock; hill_alpha[c], hill_k[c])"]:::det
+    end
+
+    subgraph PLATE_TGKC["time t, geo g, kpi k, channel c"]
+        contrib["channel_contrib[t,g,k,c] =<br/>X_sat[t,g,c]&middot;scale_geo[c,k,g]"]:::det
+    end
+
+    subgraph PLATE_TGK["time t, geo g, kpi k"]
+        media["media_contrib[t,g,k] =<br/>&Sigma;<sub>c</sub> channel_contrib[t,g,k,c]"]:::det
+        base["baseline[t,g,k] =<br/>intercept[k,g] + fourier + controls"]:::det
+        mu["mu[t,g,k] =<br/>baseline[t,g,k] + media_contrib[t,g,k]"]:::det
+        obs(("obs[t,g,k]<br/>Likelihood(kpi=k)")):::obs
+    end
+
+    subgraph PLATE_K["kpi k"]
+        disp(("dispersion[k]<br/>&sigma;<sub>k</sub> or &alpha;<sub>k</sub> ~ HalfNormal")):::rv
+    end
+
+    subgraph PLATE_E["experiment e &isin; E (geo-holdout tests)"]
+        liftmodel["lift_model[e] =<br/>&Sigma;<sub>t&isin;T<sub>e</sub>,g&isin;G<sub>e</sub></sub> [exp(mu) &minus; exp(mu &minus; &Sigma;<sub>c&isin;C<sub>e</sub></sub> channel_contrib)]"]:::det
+        lift(("lift_obs[e]<br/>Normal or StudentT(lift_model[e], se[e])")):::obs
+    end
+
+    decay --> adstock
+    spend --> adstock
+    adstock --> sat
+    hillA --> sat
+    hillK --> sat
+    scaleG --> scaleKPI --> scaleGeo
+    scaleGeo --> contrib
+    sat --> contrib
+    contrib --> media
+    intercept --> base
+    fbeta --> base
+    bctrl --> base
+    media --> mu
+    base --> mu
+    mu --> obs
+    disp --> obs
+    mu --> liftmodel
+    contrib --> liftmodel
+    liftmodel --> lift
+```
+
+Notes:
+- `scale_kpi` and `scale_geo` are implemented as a non-centered reparameterization (`scale_*_raw ~ Normal(0,1)` scaled by a `HalfNormal` sigma) for sampler efficiency; the diagram shows the mathematically equivalent effective distribution.
+- `dispersion[k]` is `sigma_{kpi}` for `gaussian`/`lognormal` likelihoods or `nb_alpha_{kpi}` for `negative_binomial`; `binomial` has no dispersion parameter (uses `population` as `n` and `sigmoid(mu)` as `p`).
+- The `PLATE_E` calibration likelihood is only added when `HierarchicalMMM.fit()` is called with `experiments=...` (`calmmm/calibration/likelihood.py`); each experiment `e` reads `mu` and `channel_contrib` for its own subset of time/geo/channel indices, so it depends on the fitted model rather than being part of every fit.
+
+---
+
 ## 1. Preparing your data
 
 ### Wide-format input
