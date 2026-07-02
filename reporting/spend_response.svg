@@ -4,15 +4,15 @@
 <text x="24.0" y="64.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">Modeled saturation response change from a 10% spend increase.</text>
 <text x="280.0" y="94.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#111111">Response change (percentage points)</text>
 <text x="24.0" y="170.2" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">affiliate</text>
-<rect x="280" y="112.0" width="179.9" height="89.5" fill="#ff6b35" />
-<text x="467.9" y="170.2" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.65 pp</text>
+<rect x="280" y="112.0" width="127.1" height="89.5" fill="#ff6b35" />
+<text x="415.1" y="170.2" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.25 pp</text>
 <text x="24.0" y="273.7" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">direct_mail</text>
-<rect x="280" y="215.5" width="126.1" height="89.5" fill="#ff6b35" />
-<text x="414.1" y="273.7" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.45 pp</text>
+<rect x="280" y="215.5" width="528.5" height="89.5" fill="#ff6b35" />
+<text x="816.5" y="273.7" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">1.05 pp</text>
 <text x="24.0" y="377.2" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">search</text>
 <rect x="280" y="319.0" width="643.5" height="89.5" fill="#ff6b35" />
-<text x="931.5" y="377.2" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">2.31 pp</text>
+<text x="931.5" y="377.2" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">1.28 pp</text>
 <text x="24.0" y="480.7" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">social</text>
-<rect x="280" y="422.5" width="207.6" height="89.5" fill="#ff6b35" />
-<text x="495.6" y="480.7" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.74 pp</text>
+<rect x="280" y="422.5" width="498.9" height="89.5" fill="#ff6b35" />
+<text x="786.9" y="480.7" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.99 pp</text>
 </svg>

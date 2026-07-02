@@ -4,27 +4,27 @@
 <text x="24.0" y="64.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">Marginal contribution per $1 of spend; higher values indicate stronger modeled return.</text>
 <text x="280.0" y="94.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#111111">ROI (KPI units per $1 spend)</text>
 <text x="24.0" y="136.5" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">funded_revenue / search</text>
-<rect x="280" y="112.0" width="330.9" height="37.8" fill="#ff6b35" />
-<text x="618.9" y="136.5" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">13.85</text>
-<text x="24.0" y="188.3" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">applications / affiliate</text>
-<rect x="280" y="163.8" width="0.5" height="37.8" fill="#ff6b35" />
-<text x="288.5" y="188.3" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.02</text>
-<text x="24.0" y="240.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">applications / search</text>
-<rect x="280" y="215.5" width="0.5" height="37.8" fill="#ff6b35" />
-<text x="288.5" y="240.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.02</text>
-<text x="24.0" y="291.8" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">applications / direct_mail</text>
-<rect x="280" y="267.2" width="0.2" height="37.8" fill="#ff6b35" />
-<text x="288.2" y="291.8" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.01</text>
+<rect x="280" y="112.0" width="175.4" height="37.8" fill="#ff6b35" />
+<text x="463.4" y="136.5" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">5.44</text>
+<text x="24.0" y="188.3" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">funded_revenue / social</text>
+<rect x="280" y="163.8" width="76.1" height="37.8" fill="#ff6b35" />
+<text x="364.1" y="188.3" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">2.36</text>
+<text x="24.0" y="240.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">funded_revenue / direct_mail</text>
+<rect x="280" y="215.5" width="57.1" height="37.8" fill="#ff6b35" />
+<text x="345.1" y="240.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">1.77</text>
+<text x="24.0" y="291.8" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">applications / search</text>
+<rect x="280" y="267.2" width="0.3" height="37.8" fill="#ff6b35" />
+<text x="288.3" y="291.8" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.01</text>
 <text x="24.0" y="343.5" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">applications / social</text>
 <rect x="280" y="319.0" width="0.1" height="37.8" fill="#ff6b35" />
-<text x="288.1" y="343.5" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.01</text>
-<text x="24.0" y="395.3" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">funded_revenue / affiliate</text>
-<rect x="280" y="370.8" width="0.0" height="37.8" fill="#ff6b35" />
-<text x="288.0" y="395.3" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">-0.86</text>
-<text x="24.0" y="447.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">funded_revenue / direct_mail</text>
+<text x="288.1" y="343.5" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.00</text>
+<text x="24.0" y="395.3" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">applications / direct_mail</text>
+<rect x="280" y="370.8" width="0.1" height="37.8" fill="#ff6b35" />
+<text x="288.1" y="395.3" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.00</text>
+<text x="24.0" y="447.0" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">applications / affiliate</text>
 <rect x="280" y="422.5" width="0.0" height="37.8" fill="#ff6b35" />
-<text x="288.0" y="447.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">-3.96</text>
-<text x="24.0" y="498.8" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">funded_revenue / social</text>
+<text x="288.0" y="447.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">0.00</text>
+<text x="24.0" y="498.8" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111">funded_revenue / affiliate</text>
 <rect x="280" y="474.2" width="0.0" height="37.8" fill="#ff6b35" />
-<text x="288.0" y="498.8" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">-26.94</text>
+<text x="288.0" y="498.8" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111">-19.94</text>
 </svg>
