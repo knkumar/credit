@@ -43,23 +43,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--weeks",
         type=int,
-        default=16,
+        default=0,
         help="Number of earliest complete weeks to fit. Use 0 for the full panel.",
     )
     parser.add_argument("--mode", choices=["map", "vi", "sample"], default="map")
     parser.add_argument("--holdout-fraction", type=float, default=0.2)
-    parser.add_argument("--maxeval", type=int, default=300, help="MAP maxeval.")
+    parser.add_argument("--maxeval", type=int, default=2000, help="MAP maxeval.")
     parser.add_argument("--draws", type=int, default=200, help="MCMC draws.")
     parser.add_argument("--tune", type=int, default=200, help="MCMC tuning steps.")
     parser.add_argument("--chains", type=int, default=1, help="MCMC chains.")
     parser.add_argument("--vi-iterations", type=int, default=5_000)
     parser.add_argument(
+        "--adjust-lift-windows",
+        dest="adjust_lift_windows",
+        action="store_true",
+        help="Move sample lift-test windows into the training period (for use with --weeks subsets whose range excludes the tests' real dates).",
+    )
+    parser.add_argument(
         "--no-adjust-lift-windows",
         dest="adjust_lift_windows",
         action="store_false",
-        help="Do not move sample lift-test windows into the demo subset training period.",
+        help="Use the lift tests' real dates (default; requires the training window to cover them).",
     )
-    parser.set_defaults(adjust_lift_windows=True)
+    parser.set_defaults(adjust_lift_windows=False)
     return parser.parse_args(argv)
 
 
