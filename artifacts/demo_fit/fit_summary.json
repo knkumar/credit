@@ -9,7 +9,7 @@
     "West"
   ],
   "lift_tests": 2,
-  "map_param_count": 25,
+  "map_param_count": 27,
   "outputs": {
     "roi": "artifacts/demo_fit/roi.csv",
     "calibration": "artifacts/demo_fit/calibration_fit.csv",
