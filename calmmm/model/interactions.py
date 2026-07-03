@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Callable, Literal
 
 import pytensor.tensor as pt
@@ -88,3 +88,65 @@ class InteractionGraph:
                 f"interaction graph references unknown channel(s): {unknown}. "
                 f"Known channels: {known_channels}"
             )
+
+
+import pymc as pm
+
+
+def build_interaction_step(
+    graph: InteractionGraph,
+    *,
+    channels: list[str],
+    X_adstock: pt.TensorVariable,
+) -> Callable[[pt.TensorVariable], pt.TensorVariable]:
+    """
+    Return a function that applies `graph`'s edges to a base channel_contrib
+    tensor [T, G, K, C] and returns the boosted tensor of the same shape.
+
+    Must be invoked inside an active pm.Model() context — creates one
+    gamma_<source>_<target> free RV per edge.
+
+    For a base channel (no incoming edges of its own), the source signal is
+    its own adstocked spend, X_adstock[..., idx] — already scaled to a
+    roughly [0, few] range because raw spend is divided by that channel's
+    historical max before adstock (existing pipeline behavior), broadcast
+    over the K axis. For a chained edge (source was itself boosted upstream
+    in topological order), the source signal is that channel's finalized,
+    boosted contribution, normalized by its own mean absolute value so
+    gamma's prior scale stays comparable regardless of where in the graph
+    an edge sits.
+    """
+    graph.validate_channels(channels)
+    channel_idx = {name: i for i, name in enumerate(channels)}
+    order = graph.topological_order()
+
+    def apply(channel_contrib: pt.TensorVariable) -> pt.TensorVariable:
+        slices = {name: channel_contrib[:, :, :, channel_idx[name]] for name in channels}
+        chain_scales: dict[str, pt.TensorVariable] = {}
+
+        for name in order:
+            incoming = graph.incoming_edges(name)
+            if not incoming:
+                continue
+            contrib = slices[name]  # [T, G, K]
+            for edge in incoming:
+                if edge.source in chain_scales:
+                    source_contrib = slices[edge.source]  # [T, G, K], already boosted
+                    scale = chain_scales[edge.source]
+                    signal = source_contrib / scale
+                else:
+                    signal = X_adstock[:, :, channel_idx[edge.source]][:, :, None]  # [T, G, 1]
+
+                if edge.prior == "half_normal":
+                    gamma = pm.HalfNormal(f"gamma_{edge.source}_{edge.target}", sigma=edge.prior_sigma)
+                    contrib = contrib * (1.0 + gamma * signal)
+                else:  # "normal" — two-sided, exponential form guarantees strict positivity
+                    gamma = pm.Normal(f"gamma_{edge.source}_{edge.target}", mu=0.0, sigma=edge.prior_sigma)
+                    contrib = contrib * pt.exp(gamma * signal)
+
+            slices[name] = contrib
+            chain_scales[name] = pt.mean(pt.abs(contrib)) + 1e-8
+
+        return pt.stack([slices[name] for name in channels], axis=-1)  # [T, G, K, C]
+
+    return apply
