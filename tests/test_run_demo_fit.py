@@ -214,7 +214,11 @@ def test_write_outputs_persists_interaction_gammas(tmp_path, monkeypatch):
     fit = SimpleNamespace(
         data=SimpleNamespace(channels=["search"]),
         calibration_targets=[],
-        map_params={"mu": 1, "gamma_direct_mail_search": 0.00241},
+        map_params={
+            "mu": 1,
+            "gamma_direct_mail_search": 0.00241,
+            "gamma_direct_mail_search_log__": -6.027888852353258,
+        },
         fit_metrics=lambda: {"rmse_applications": 12.0, "r2_applications": 0.82},
         mcmc_diagnostics=lambda: pd.DataFrame(
             {"parameter": ["adstock_decay[search]"], "r_hat": [1.01], "ess_bulk": [250.0], "ess_tail": [200.0]}

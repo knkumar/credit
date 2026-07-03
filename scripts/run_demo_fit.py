@@ -234,7 +234,7 @@ def write_outputs(
     interaction_gammas = {
         name: float(value)
         for name, value in (fit.map_params or {}).items()
-        if name.startswith("gamma_")
+        if name.startswith("gamma_") and not name.endswith("_log__")
     } if fit.map_params is not None else {}
 
     summary = {
