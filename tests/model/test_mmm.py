@@ -241,3 +241,63 @@ def test_rebuild_guard_fit_calls_build_model_when_switching_to_uncalibrated(mmmd
     assert build_calls[0] is None, "build_model should have been called with experiments=None"
     # Model should have been rebuilt
     assert id(mmm._model) != initial_model_id
+
+
+from calmmm.model.interactions import ChannelInteraction, InteractionGraph
+
+
+def test_hierarchical_mmm_default_interaction_graph_none():
+    mmm = HierarchicalMMM()
+    assert mmm.interaction_graph is None
+
+
+def test_build_model_with_interaction_graph_adds_gamma_rv(mmmdata):
+    graph = InteractionGraph(edges=[ChannelInteraction(source="social", target="search")])
+    mmm = HierarchicalMMM(interaction_graph=graph)
+    model = mmm.build_model(mmmdata)
+    names = {v.name for v in model.free_RVs}
+    assert "gamma_social_search" in names
+
+
+def test_build_model_with_interaction_graph_channel_contrib_shape_unchanged(mmmdata):
+    graph = InteractionGraph(edges=[ChannelInteraction(source="social", target="search")])
+    mmm = HierarchicalMMM(interaction_graph=graph)
+    model = mmm.build_model(mmmdata)
+    val = pm.draw(model["channel_contrib"], random_seed=0)
+    T_train = int(mmm._train_mask.sum())
+    assert val.shape == (T_train, len(mmmdata.geos), len(mmmdata.kpis), len(mmmdata.channels))
+
+
+def test_build_model_with_interaction_graph_logp_finite(mmmdata):
+    graph = InteractionGraph(edges=[ChannelInteraction(source="social", target="search")])
+    mmm = HierarchicalMMM(interaction_graph=graph)
+    model = mmm.build_model(mmmdata)
+    with model:
+        ip = model.initial_point()
+        lp = model.compile_logp()(ip)
+    assert np.isfinite(lp)
+
+
+def test_build_model_without_interaction_graph_no_gamma_rv(mmmdata):
+    """Regression: default (no interaction_graph) must not introduce any gamma_* RVs."""
+    mmm = HierarchicalMMM()
+    model = mmm.build_model(mmmdata)
+    names = {v.name for v in model.free_RVs}
+    assert not any(n.startswith("gamma_") for n in names)
+
+
+def test_build_model_unknown_channel_in_interaction_graph_raises(mmmdata):
+    graph = InteractionGraph(edges=[ChannelInteraction(source="tv", target="search")])
+    mmm = HierarchicalMMM(interaction_graph=graph)
+    with pytest.raises(ValueError, match="unknown channel"):
+        mmm.build_model(mmmdata)
+
+
+def test_public_import_channel_interaction():
+    from calmmm import ChannelInteraction
+    assert ChannelInteraction is not None
+
+
+def test_public_import_interaction_graph():
+    from calmmm import InteractionGraph
+    assert InteractionGraph is not None

@@ -15,6 +15,7 @@ from calmmm.model.coords import build_coords, build_arrays, build_controls_array
 from calmmm.model.priors import PriorConfig
 from calmmm.model.transforms import geometric_adstock_pt, hill_saturation_pt
 from calmmm.model.components import _build_baseline, _build_media_hierarchy, _add_likelihood
+from calmmm.model.interactions import InteractionGraph, build_interaction_step
 from calmmm.transforms.seasonality import fourier_features
 from calmmm.calibration.targets import build_calibration_targets
 from calmmm.calibration.likelihood import add_calibration_likelihood
@@ -37,10 +38,12 @@ class HierarchicalMMM:
         priors: Optional[PriorConfig] = None,
         n_fourier_pairs: int = 2,
         holdout_fraction: float = 0.2,
+        interaction_graph: Optional[InteractionGraph] = None,
     ) -> None:
         self.priors = priors or PriorConfig()
         self.n_fourier_pairs = n_fourier_pairs
         self.holdout_fraction = holdout_fraction
+        self.interaction_graph = interaction_graph
         # Set by build_model()
         self._model: Optional[pm.Model] = None
         self._data: Optional[MMMData] = None
@@ -151,8 +154,15 @@ class HierarchicalMMM:
             # Baseline
             baseline = _build_baseline(fourier_train, obs_mean_log, self.priors, ctrl_train)
 
-            # Media hierarchy
-            media_contrib = _build_media_hierarchy(X_sat, self.priors)
+            # Media hierarchy, with optional channel-to-channel interactions
+            apply_interactions = None
+            if self.interaction_graph is not None:
+                apply_interactions = build_interaction_step(
+                    self.interaction_graph,
+                    channels=data.channels,
+                    X_adstock=X_adstocked,
+                )
+            media_contrib = _build_media_hierarchy(X_sat, self.priors, apply_interactions=apply_interactions)
 
             # Linear predictor (log scale)
             mu = pm.Deterministic("mu", baseline + media_contrib)
