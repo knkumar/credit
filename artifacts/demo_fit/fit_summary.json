@@ -10,6 +10,10 @@
   ],
   "lift_tests": 2,
   "map_param_count": 27,
+  "interaction_gammas": {
+    "gamma_direct_mail_search_log__": -6.027888852353258,
+    "gamma_direct_mail_search": 0.0024105776959224812
+  },
   "outputs": {
     "roi": "artifacts/demo_fit/roi.csv",
     "calibration": "artifacts/demo_fit/calibration_fit.csv",
