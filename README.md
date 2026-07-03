@@ -10,6 +10,7 @@ Calibrated Hierarchical Bayesian Media Mix Model.
 - **Flexible adstock & saturation** — geometric adstock decay and Hill saturation curves, all differentiable via PyTensor.
 - **Multi-KPI support** — Gaussian, log-normal, negative binomial, and binomial observation likelihoods per KPI.
 - **Incrementality calibration** — anchors channel contributions to lift measurements from geo experiments.
+- **Channel interactions** — optional directed graph of multiplicative boosts between channels (e.g. direct mail lifting branded search), fit as extra `gamma` parameters alongside the rest of the model.
 - **Three inference modes** — full MCMC (`sample`), mean-field VI (`vi`), and MAP estimation (`map`).
 - **Attribution & ROI** — counterfactual channel contributions, ROI by channel/KPI, and Hill saturation curves.
 
@@ -66,7 +67,7 @@ The same demo output includes `fit_quality.csv` with RMSE/R2 and `mcmc_diagnosti
 |---|---|
 | ![Fitted saturation curves showing media response index by spend level](reporting/saturation_curves.svg) | ![ROI by KPI and channel](reporting/roi.svg) |
 
-See the [User Guide](docs/USER_GUIDE.md#6-reporting-visuals) for the full reporting workflow and additional plots.
+See the [User Guide](docs/USER_GUIDE.md#7-reporting-visuals) for the full reporting workflow and additional plots.
 
 ## Tests
 
