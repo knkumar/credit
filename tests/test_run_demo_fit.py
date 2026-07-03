@@ -25,8 +25,34 @@ def test_default_parser_is_demo_first():
     assert args.maxeval == 2000
     assert args.holdout_fraction == 0.2
     assert args.adjust_lift_windows is False
+    assert args.direct_mail_search_interaction is True
     assert args.reporting_dir == Path("reporting")
     assert args.spend_multiplier == 1.10
+
+
+def test_build_model_instance_default_has_direct_mail_search_interaction():
+    script = _load_script()
+    args = script.parse_args([])
+    mmm = script.build_model_instance(args)
+    assert mmm.interaction_graph is not None
+    assert len(mmm.interaction_graph.edges) == 1
+    edge = mmm.interaction_graph.edges[0]
+    assert edge.source == "direct_mail"
+    assert edge.target == "search"
+
+
+def test_build_model_instance_no_interaction_flag_disables():
+    script = _load_script()
+    args = script.parse_args(["--no-direct-mail-search-interaction"])
+    mmm = script.build_model_instance(args)
+    assert mmm.interaction_graph is None
+
+
+def test_build_model_instance_passes_holdout_fraction():
+    script = _load_script()
+    args = script.parse_args(["--holdout-fraction", "0.3"])
+    mmm = script.build_model_instance(args)
+    assert mmm.holdout_fraction == 0.3
 
 
 def test_select_week_subset_keeps_complete_weeks():

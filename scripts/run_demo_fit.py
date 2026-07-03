@@ -12,6 +12,7 @@ from calmmm import MMMData, IncrementalityTests, HierarchicalMMM
 from calmmm import channel_contributions, compute_roi, saturation_curve
 from calmmm.attribution.curves import spend_response_report
 from calmmm.calibration.lift import compute_model_lift
+from calmmm.model.interactions import ChannelInteraction, InteractionGraph
 
 
 DEFAULT_PANEL = Path("outputs/calmmm_sample_weekly_panel.csv")
@@ -66,6 +67,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Use the lift tests' real dates (default; requires the training window to cover them).",
     )
     parser.set_defaults(adjust_lift_windows=False)
+    parser.add_argument(
+        "--no-direct-mail-search-interaction",
+        dest="direct_mail_search_interaction",
+        action="store_false",
+        help="Disable the direct_mail -> search channel interaction edge (enabled by default).",
+    )
+    parser.set_defaults(direct_mail_search_interaction=True)
     return parser.parse_args(argv)
 
 
@@ -152,6 +160,18 @@ def build_experiments(lift_tests: pd.DataFrame, data: MMMData) -> Incrementality
         standard_error="se",
         mmmdata=data,
         **kwargs,
+    )
+
+
+def build_model_instance(args: argparse.Namespace) -> HierarchicalMMM:
+    interaction_graph = None
+    if args.direct_mail_search_interaction:
+        interaction_graph = InteractionGraph(edges=[
+            ChannelInteraction(source="direct_mail", target="search"),
+        ])
+    return HierarchicalMMM(
+        holdout_fraction=args.holdout_fraction,
+        interaction_graph=interaction_graph,
     )
 
 
@@ -271,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
 
     data = build_data(panel)
     experiments = build_experiments(lift_tests, data)
-    model = HierarchicalMMM(holdout_fraction=args.holdout_fraction)
+    model = build_model_instance(args)
     fit = model.fit(data, experiments=experiments, mode=args.mode, **fit_kwargs(args))
     write_outputs(args=args, panel=panel, lift_tests=lift_tests, fit=fit)
     return 0
