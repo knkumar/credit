@@ -139,7 +139,8 @@ def build_interaction_step(
 
                 if edge.prior == "half_normal":
                     gamma = pm.HalfNormal(f"gamma_{edge.source}_{edge.target}", sigma=edge.prior_sigma)
-                    contrib = contrib * (1.0 + gamma * signal)
+                    boost_signal = pt.maximum(signal, 0.0)
+                    contrib = contrib * (1.0 + gamma * boost_signal)
                 else:  # "normal" — two-sided, exponential form guarantees strict positivity
                     gamma = pm.Normal(f"gamma_{edge.source}_{edge.target}", mu=0.0, sigma=edge.prior_sigma)
                     contrib = contrib * pt.exp(gamma * signal)

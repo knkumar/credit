@@ -190,3 +190,30 @@ def test_build_interaction_step_chain_uses_boosted_upstream_signal():
     assert "gamma_search_social" in names
     social_idx = 2
     assert not np.allclose(val[:, :, :, social_idx], 1.0)
+
+
+def test_build_interaction_step_half_normal_never_flips_sign_from_negative_chain_source():
+    """Regression test: a half_normal edge's multiplier must stay >= 1.0 even when the
+    chained source's finalized contribution is negative. Before the pt.maximum(signal, 0.0)
+    clamp, a large enough gamma draw could push (1.0 + gamma * signal) negative when signal
+    (the chained source's boosted contribution) was negative, flipping the target's sign."""
+    T, G, K, C = 4, 2, 1, 3
+    contrib_val = np.ones((T, G, K, C), dtype="float64")
+    contrib_val[:, :, :, 1] = -2.0  # search's own base contribution: forced negative
+    contrib_val[:, :, :, 2] = -2.0  # social's own base contribution: known nonzero constant
+    adstock_val = np.zeros((T, G, C), dtype="float64")
+    adstock_val[:, :, 0] = 5.0  # direct_mail: large own signal, boosts search's magnitude
+
+    graph = InteractionGraph(edges=[
+        ChannelInteraction(source="direct_mail", target="search", prior_sigma=1.0),
+        ChannelInteraction(source="search", target="social", prior_sigma=1.0),
+    ])
+    with pm.Model(coords=_coords_3ch(T, G, K)):
+        apply = build_interaction_step(graph, channels=CHANNELS_3, X_adstock=pt.as_tensor_variable(adstock_val))
+        boosted = apply(pt.as_tensor_variable(contrib_val))
+        val = pm.draw(boosted, random_seed=1)  # reproduces a sign flip before the fix
+
+    social_idx = 2
+    base_social = -2.0
+    multiplier = val[:, :, :, social_idx] / base_social
+    assert np.all(multiplier >= 1.0 - 1e-9)
