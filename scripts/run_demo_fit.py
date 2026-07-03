@@ -231,6 +231,12 @@ def write_outputs(
     curves.to_csv(args.reporting_dir / "saturation_curves.csv", index=False)
     response_report.to_csv(args.reporting_dir / "spend_response.csv", index=False)
 
+    interaction_gammas = {
+        name: float(value)
+        for name, value in (fit.map_params or {}).items()
+        if name.startswith("gamma_")
+    } if fit.map_params is not None else {}
+
     summary = {
         "mode": args.mode,
         "weeks": int(panel["week"].nunique()),
@@ -238,6 +244,7 @@ def write_outputs(
         "geos": sorted(panel["geo"].unique().tolist()),
         "lift_tests": int(len(lift_tests)),
         "map_param_count": len(fit.map_params) if fit.map_params is not None else None,
+        "interaction_gammas": interaction_gammas,
         "outputs": {
             "roi": str(args.output_dir / "roi.csv"),
             "calibration": str(args.output_dir / "calibration_fit.csv"),

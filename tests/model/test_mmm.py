@@ -301,3 +301,18 @@ def test_public_import_channel_interaction():
 def test_public_import_interaction_graph():
     from calmmm import InteractionGraph
     assert InteractionGraph is not None
+
+
+@pytest.mark.slow
+def test_interaction_graph_none_is_bit_identical_to_omitted(mmmdata):
+    """Spec requirement: interaction_graph=None must be bit-identical to omitting it entirely."""
+    mmm_omitted = HierarchicalMMM()
+    fit_omitted = mmm_omitted.fit(mmmdata, mode="map")
+
+    mmm_explicit_none = HierarchicalMMM(interaction_graph=None)
+    fit_explicit_none = mmm_explicit_none.fit(mmmdata, mode="map")
+
+    cc_omitted = np.array(fit_omitted.map_params["channel_contrib"])
+    cc_explicit = np.array(fit_explicit_none.map_params["channel_contrib"])
+    assert np.allclose(cc_omitted, cc_explicit)
+    assert fit_omitted.fit_metrics() == fit_explicit_none.fit_metrics()
