@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Callable, Optional
+
 import numpy as np
 import pymc as pm
 import pytensor.tensor as pt
@@ -70,6 +72,8 @@ def _build_baseline(
 def _build_media_hierarchy(
     X_sat: pt.TensorVariable,
     priors: PriorConfig,
+    *,
+    apply_interactions: Optional[Callable[[pt.TensorVariable], pt.TensorVariable]] = None,
 ) -> pt.TensorVariable:
     """
     Three-level non-centered geo×KPI hierarchy for media contributions.
@@ -91,6 +95,11 @@ def _build_media_hierarchy(
         scale_kpi[C, K] = scale_global + sigma_kpi * Normal(0,1)  (non-centered)
         scale_geo[C, K, G] = scale_kpi + sigma_geo * Normal(0,1)  (non-centered)
         contrib[t,g,k] = sum_c( X_sat[t,g,c] * scale_geo[c,k,g] )
+
+    If `apply_interactions` is provided, it is called on the raw per-channel
+    contribution tensor [T, G, K, C] before it is registered as the
+    "channel_contrib" Deterministic — its return value (same shape) becomes
+    the model's channel_contrib. See calmmm.model.interactions.build_interaction_step.
 
     scale_kpi and scale_geo can be negative: the KPI- and geo-level offsets are
     unconstrained Normal, so a channel can have a negative net coefficient for a
@@ -129,6 +138,8 @@ def _build_media_hierarchy(
     # X_sat [T,G,C] → [T,G,1,C]; scale_geo [C,K,G] → [G,K,C] → [1,G,K,C]
     scale_geo_gkc = scale_geo.dimshuffle(2, 1, 0)  # [G, K, C]
     channel_contrib_tgkc = X_sat[:, :, None, :] * scale_geo_gkc[None, :, :, :]  # [T, G, K, C]
+    if apply_interactions is not None:
+        channel_contrib_tgkc = apply_interactions(channel_contrib_tgkc)
     pm.Deterministic("channel_contrib", channel_contrib_tgkc)
     return channel_contrib_tgkc.sum(axis=-1)  # [T, G, K]
 

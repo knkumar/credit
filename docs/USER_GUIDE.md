@@ -51,8 +51,13 @@ flowchart TB
         sat["X_sat[t,g,c] =<br/>Hill(X_adstock; hill_alpha[c], hill_k[c])"]:::det
     end
 
+    subgraph PLATE_EI["edge (source&rarr;target) &isin; interaction_graph.edges (optional)"]
+        gammaEdge(("gamma_source_target<br/>HalfNormal(&sigma;) or Normal(0,&sigma;)")):::rv
+    end
+
     subgraph PLATE_TGKC["time t, geo g, kpi k, channel c"]
-        contrib["channel_contrib[t,g,k,c] =<br/>X_sat[t,g,c]&middot;scale_geo[c,k,g]"]:::det
+        contribRaw["contrib_raw[t,g,k,c] =<br/>X_sat[t,g,c]&middot;scale_geo[c,k,g]"]:::det
+        contrib["channel_contrib[t,g,k,c] =<br/>interaction_step(contrib_raw)[c] if c is a target,<br/>else contrib_raw[t,g,k,c]"]:::det
     end
 
     subgraph PLATE_TGK["time t, geo g, kpi k"]
@@ -77,8 +82,10 @@ flowchart TB
     hillA --> sat
     hillK --> sat
     scaleG --> scaleKPI --> scaleGeo
-    scaleGeo --> contrib
-    sat --> contrib
+    scaleGeo --> contribRaw
+    sat --> contribRaw
+    contribRaw --> contrib
+    gammaEdge --> contrib
     contrib --> media
     intercept --> base
     fbeta --> base
@@ -96,6 +103,7 @@ Notes:
 - `scale_kpi` and `scale_geo` are implemented as a non-centered reparameterization (`scale_*_raw ~ Normal(0,1)` scaled by a `HalfNormal` sigma) for sampler efficiency; the diagram shows the mathematically equivalent effective distribution.
 - `dispersion[k]` is `sigma_{kpi}` for `gaussian`/`lognormal` likelihoods or `nb_alpha_{kpi}` for `negative_binomial`; `binomial` has no dispersion parameter (uses `population` as `n` and `sigmoid(mu)` as `p`).
 - The `PLATE_E` calibration likelihood is only added when `HierarchicalMMM.fit()` is called with `experiments=...` (`calmmm/calibration/likelihood.py`); each experiment `e` reads `mu` and `channel_contrib` for its own subset of time/geo/channel indices, so it depends on the fitted model rather than being part of every fit.
+- `PLATE_EI` and the `contribRaw -> contrib` interaction step only exist when `HierarchicalMMM(interaction_graph=...)` is constructed with a non-`None` `InteractionGraph` (`calmmm/model/interactions.py`); when omitted, `channel_contrib` is `contrib_raw` unchanged and the model is bit-identical to a fit with no interaction graph at all. See [Channel interactions](#3-channel-interactions-optional) for the API and prior semantics.
 
 ---
 
@@ -213,7 +221,50 @@ mmm = HierarchicalMMM(
 
 ---
 
-## 3. Fitting the model
+## 3. Channel interactions (optional)
+
+By default each channel's contribution is independent — `channel_contrib[t,g,k,c]` comes only from that
+channel's own adstocked, saturated spend (see [Model structure](#model-structure)). An `InteractionGraph`
+lets you declare that one channel's signal multiplicatively rescales another's contribution, e.g. direct
+mail driving branded search volume.
+
+```python
+from calmmm import ChannelInteraction, InteractionGraph, HierarchicalMMM
+
+graph = InteractionGraph(edges=[
+    ChannelInteraction(source="direct_mail", target="search"),           # half_normal, boost-only
+    ChannelInteraction(source="search", target="social", prior="normal", prior_sigma=0.3),
+])
+
+mmm = HierarchicalMMM(interaction_graph=graph)
+fit = mmm.fit(data, mode="map")
+```
+
+Each edge adds one free parameter, `gamma_<source>_<target>`, fit alongside the rest of the model:
+
+| `prior` | Distribution | Effect |
+|---|---|---|
+| `"half_normal"` (default) | `gamma ~ HalfNormal(prior_sigma)` | Boost-only — `target`'s contribution can only increase, never flip sign or shrink. |
+| `"normal"` | `gamma ~ Normal(0, prior_sigma)` | Two-sided — supports hypothesized suppression/cannibalization as well as boost. |
+
+Edges chain: if `search` is itself a target (e.g. `direct_mail -> search`) and also a source
+(`search -> social`), `social`'s boost reads `search`'s already-boosted contribution, not its raw
+spend signal. `InteractionGraph` construction rejects self-loops, duplicate edges, and cycles with
+`ValueError`; edges referencing a channel not in `data.channels` are rejected with `ValueError` at
+`mmm.fit()` time, once the graph is checked against the actual dataset.
+
+Fitted `gamma_*` values are written to `fit_summary.json` under `interaction_gammas` (see
+[Fit quality and diagnostics tables](#fit-quality-and-diagnostics-tables)) and are also available
+directly from `fit.map_params["gamma_direct_mail_search"]` (MAP) or `fit.trace` (MCMC/VI).
+
+> **Note:** with `mode="map"` a single `gamma` estimate has no uncertainty interval. If the
+> interaction is a load-bearing part of your story (not just an exploratory check), prefer
+> `mode="sample"` or `mode="vi"` and inspect the posterior width before reporting the boost as
+> a point estimate.
+
+---
+
+## 4. Fitting the model
 
 ### MAP (fast — for exploration and calibration checks)
 
@@ -249,7 +300,7 @@ fit = mmm.fit(
 
 ---
 
-## 4. Calibration with lift experiments
+## 5. Calibration with lift experiments
 
 Lift measurements from geo holdout or geo matched-market tests constrain channel contributions during fitting.
 
@@ -297,7 +348,7 @@ A `z_score` near zero means the model lift matches the observed experiment lift.
 
 ---
 
-## 5. Attribution
+## 6. Attribution
 
 ### Channel contributions (additive decomposition)
 
@@ -354,7 +405,7 @@ curve = saturation_curve(fit, channel="tv", n_points=100)
 
 ---
 
-## 6. Reporting visuals
+## 7. Reporting visuals
 
 The demo workflow writes CSV report tables first, then renders SVG charts from those tables. This keeps the fit outputs reviewable before the visual layer is generated.
 
@@ -395,6 +446,7 @@ The demo also writes non-visual diagnostic tables under `artifacts/demo_fit/`:
 |---|---|
 | `fit_quality.csv` | Training-window RMSE and R2 per KPI. R2 can be negative when the fitted mean is worse than using the KPI mean. |
 | `mcmc_diagnostics.csv` | `r_hat`, `ess_bulk`, and `ess_tail` for posterior parameters when the fit uses `mode="sample"` or `mode="vi"`. MAP fits write an empty table with the same columns because MAP has no posterior samples. |
+| `fit_summary.json` → `interaction_gammas` | `{"gamma_<source>_<target>": value, ...}` for every edge in the demo's `interaction_graph` (see [Channel interactions](#3-channel-interactions-optional)). Empty `{}` when no interaction graph is fit. |
 
 The packaged demo treats `applications` as a Gaussian KPI because the sample series is smooth and aggregated. For sparse or highly overdispersed count outcomes, prefer `negative_binomial`.
 
@@ -408,7 +460,7 @@ mcmc_diagnostics = fit.mcmc_diagnostics()
 
 ---
 
-## 7. Model evaluation
+## 8. Model evaluation
 
 ### Training fit metrics
 
@@ -441,7 +493,7 @@ Use this for visual posterior predictive checks — plot the training data again
 
 ---
 
-## 8. MCMC diagnostics
+## 9. MCMC diagnostics
 
 For MCMC fits, use the compact diagnostics table or ArviZ directly on `fit.trace`:
 
@@ -460,7 +512,7 @@ az.summary(fit.trace, var_names=["adstock_decay"])
 
 ---
 
-## 9. End-to-end example
+## 10. End-to-end example
 
 ```python
 import pandas as pd

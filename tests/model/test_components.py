@@ -232,3 +232,54 @@ def test_channel_contrib_shape():
         _build_media_hierarchy(pt.as_tensor_variable(X_sat_val), priors)
         val = pm.draw(model["channel_contrib"], random_seed=0)
     assert val.shape == (T, G, K, C)
+
+
+def test_media_hierarchy_apply_interactions_default_none_unchanged():
+    """Default apply_interactions=None must match calling without the kwarg at all."""
+    T, G, K, C = 5, 2, 4, 2
+    priors = PriorConfig()
+    X_sat_val = np.random.default_rng(7).random((T, G, C)).astype("float64")
+
+    with pm.Model(coords=_base_coords()) as model:
+        _build_media_hierarchy(pt.as_tensor_variable(X_sat_val), priors)
+        val_default = pm.draw(model["channel_contrib"], random_seed=42)
+
+    with pm.Model(coords=_base_coords()) as model2:
+        _build_media_hierarchy(pt.as_tensor_variable(X_sat_val), priors, apply_interactions=None)
+        val_explicit_none = pm.draw(model2["channel_contrib"], random_seed=42)
+
+    assert np.allclose(val_default, val_explicit_none)
+
+
+def test_media_hierarchy_apply_interactions_invoked():
+    """When apply_interactions is provided, its return value becomes channel_contrib."""
+    T, G, K, C = 5, 2, 4, 2
+    priors = PriorConfig()
+    X_sat_val = np.random.default_rng(8).random((T, G, C)).astype("float64")
+
+    def double_it(tensor):
+        return tensor * 2.0
+
+    with pm.Model(coords=_base_coords()) as model:
+        _build_media_hierarchy(pt.as_tensor_variable(X_sat_val), priors, apply_interactions=None)
+        base_val = pm.draw(model["channel_contrib"], random_seed=3)
+
+    with pm.Model(coords=_base_coords()) as model2:
+        _build_media_hierarchy(pt.as_tensor_variable(X_sat_val), priors, apply_interactions=double_it)
+        boosted_val = pm.draw(model2["channel_contrib"], random_seed=3)
+
+    assert np.allclose(boosted_val, base_val * 2.0)
+
+
+def test_media_hierarchy_apply_interactions_affects_returned_sum():
+    """The function's [T,G,K] return value (media_contrib) must reflect the boost too."""
+    T, G, K, C = 5, 2, 4, 2
+    priors = PriorConfig()
+    X_sat_val = np.random.default_rng(9).random((T, G, C)).astype("float64")
+
+    with pm.Model(coords=_base_coords()) as model:
+        media_contrib = _build_media_hierarchy(pt.as_tensor_variable(X_sat_val), priors, apply_interactions=lambda t: t * 2.0)
+        val = pm.draw(media_contrib, random_seed=5)
+        cc_val = pm.draw(model["channel_contrib"], random_seed=5)
+
+    assert np.allclose(val, cc_val.sum(axis=-1))
