@@ -67,7 +67,7 @@ The same demo output includes `fit_quality.csv` with RMSE/R2 and `mcmc_diagnosti
 |---|---|
 | ![Fitted saturation curves showing media response index by spend level](reporting/saturation_curves.svg) | ![ROI by KPI and channel](reporting/roi.svg) |
 
-See the [User Guide](docs/USER_GUIDE.md#7-reporting-visuals) for the full reporting workflow and additional plots.
+See the [User Guide](docs/user_guide.md#7-reporting-visuals) for the full reporting workflow and additional plots.
 
 ## Tests
 
@@ -92,6 +92,6 @@ calmmm/
 
 ## Documentation
 
-- [User Guide](docs/USER_GUIDE.md) — full workflow with data prep, priors, calibration, and attribution.
-- [End-to-End Workflow](docs/END_TO_END_WORKFLOW.md) — flow and sequence diagrams connecting data, model, attribution, and reporting.
-- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) — production setup, batch jobs, monitoring.
+- [User Guide](docs/user_guide.md) — full workflow with data prep, priors, calibration, and attribution.
+- [End-to-End Workflow](docs/end_to_end_workflow.md) — flow and sequence diagrams connecting data, model, attribution, and reporting.
+- [Deployment Guide](docs/deployment_guide.md) — production setup, batch jobs, monitoring.
