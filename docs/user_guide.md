@@ -4,7 +4,7 @@
 
 `calmmm` fits a Calibrated Hierarchical Bayesian MMM. The model estimates the contribution of each media channel to each business outcome (KPI), pooling information across geographies. Optionally, lift measurements from geo experiments constrain channel contributions to reduce bias from confounding.
 
-For a diagrammed view of how data preparation, fitting, attribution, and reporting connect, see the [End-to-End Workflow](END_TO_END_WORKFLOW.md).
+For a diagrammed view of how data preparation, fitting, attribution, and reporting connect, see the [End-to-End Workflow](end_to_end_workflow.md).
 
 ---
 
