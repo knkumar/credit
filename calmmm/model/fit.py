@@ -11,6 +11,7 @@ from calmmm.data.containers import MMMData
 
 if TYPE_CHECKING:
     from calmmm.model.mmm import HierarchicalMMM
+    from calmmm.calibration.targets import IncrementalityTests
 
 
 def eval_mu_and_channel_contrib(fit: "MMMFit"):
@@ -126,7 +127,7 @@ class MMMFit:
             )
 
     @classmethod
-    def from_netcdf(cls, path, data, mmm) -> "MMMFit":
+    def from_netcdf(cls, path, data, mmm, experiments: Optional["IncrementalityTests"] = None) -> "MMMFit":
         """
         Reconstruct an ``MMMFit`` from a netCDF file written by ``to_netcdf``.
 
@@ -155,7 +156,7 @@ class MMMFit:
 
         # Reconstruct the PyMC model (required even for MAP fits so downstream
         # methods that need self.model work correctly).
-        mmm.build_model(data)
+        mmm.build_model(data, experiments=experiments)
         model = getattr(mmm, "_model", None)
 
         # Try loading as arviz InferenceData first.
