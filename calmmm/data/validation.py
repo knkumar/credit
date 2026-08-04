@@ -63,6 +63,20 @@ def _check_missing_outcomes(dataset: MMMData, result: ValidationResult) -> None:
         result.errors.append(
             f"Missing outcome values: {missing} rows have NaN outcome"
         )
+    
+    expected_obs_len = dataset.n_times * dataset.n_geos * dataset.n_kpis
+    if len(dataset.observations) != expected_obs_len:
+        result.errors.append(
+            f"Incomplete observations panel: expected {expected_obs_len} rows "
+            f"but found {len(dataset.observations)}. Please provide balanced panel data."
+        )
+
+    expected_media_len = dataset.n_times * dataset.n_geos * dataset.n_channels
+    if len(dataset.media) != expected_media_len:
+        result.errors.append(
+            f"Incomplete media panel: expected {expected_media_len} rows "
+            f"but found {len(dataset.media)}. Please provide balanced panel data."
+        )
 
 
 def _check_count_kpi_integrity(dataset: MMMData, result: ValidationResult) -> None:
@@ -88,10 +102,10 @@ def _check_binomial_kpi_has_population(dataset: MMMData, result: ValidationResul
     ].tolist()
     for kpi in binomial_kpis:
         kpi_obs = dataset.observations[dataset.observations["kpi"] == kpi]
-        if kpi_obs["population"].isna().all():
-            result.warnings.append(
-                f"KPI '{kpi}' uses binomial likelihood but no population column "
-                f"was provided. Supply population= in from_dataframe()."
+        if kpi_obs["population"].isna().any():
+            result.errors.append(
+                f"KPI '{kpi}' uses binomial likelihood but missing population data "
+                f"for some rows. Supply population= in from_dataframe()."
             )
 
 

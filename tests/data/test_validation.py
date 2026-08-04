@@ -41,7 +41,7 @@ def test_missing_outcomes_error(synthetic_panel):
     assert any("missing" in e.lower() for e in result.errors)
 
 
-def test_binomial_kpi_without_population_warns(synthetic_panel):
+def test_binomial_kpi_without_population_errors(synthetic_panel):
     dataset = MMMData.from_dataframe(
         synthetic_panel,
         time="week", geo="dma",
@@ -50,7 +50,7 @@ def test_binomial_kpi_without_population_warns(synthetic_panel):
         kpi_likelihoods={"visits": "binomial"},
     )
     result = validate_mmmdata(dataset)
-    assert any("binomial" in w.lower() for w in result.warnings)
+    assert any("binomial" in e.lower() for e in result.errors)
 
 
 def test_weak_media_variation_warns(synthetic_panel):
