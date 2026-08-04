@@ -59,12 +59,22 @@ def _check_negative_spend(dataset: MMMData, result: ValidationResult) -> None:
 
 
 def _check_missing_outcomes(dataset: MMMData, result: ValidationResult) -> None:
-    missing = int(dataset.observations["outcome"].isna().sum())
-    if missing > 0:
-        result.errors.append(
-            f"Missing outcome values: {missing} rows have NaN outcome"
-        )
-    
+    discrete_likelihoods = {"binomial", "negative_binomial"}
+    for _, row in dataset.kpi_metadata.iterrows():
+        kpi = row["kpi"]
+        is_discrete = row["likelihood"] in discrete_likelihoods
+        kpi_obs = dataset.observations[dataset.observations["kpi"] == kpi]
+        missing = int(kpi_obs["outcome"].isna().sum())
+        if missing > 0:
+            if is_discrete:
+                result.errors.append(
+                    f"Missing outcome values for discrete KPI '{kpi}': PyMC cannot impute discrete data. {missing} missing values found."
+                )
+            else:
+                result.warnings.append(
+                    f"Missing outcome values for continuous KPI '{kpi}': {missing} rows have NaN outcome. PyMC will impute these."
+                )
+
     expected_obs_len = dataset.n_times * dataset.n_geos * dataset.n_kpis
     if len(dataset.observations) != expected_obs_len:
         result.errors.append(
