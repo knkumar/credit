@@ -58,7 +58,7 @@ def weibull_adstock(
     from scipy.stats import weibull_min  # lazy import — scipy is optional at module load time
 
     x = np.asarray(x, dtype=float)
-    lags = np.arange(0, n_lags, dtype=float)
+    lags = np.arange(0, n_lags, dtype=float) + 1e-5
     weights = weibull_min.pdf(lags, c=shape, scale=scale)
     total = weights.sum()
     weights = weights / total if total > 0 else np.ones(n_lags) / n_lags
