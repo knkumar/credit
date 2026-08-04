@@ -115,7 +115,7 @@ class MMMFit:
             # when variables have different sizes.
             data_vars = {}
             for k, v in self.map_params.items():
-                arr = _np.atleast_1d(v)
+                arr = _np.asarray(v)
                 dims = [f"{k}_dim_{i}" for i in range(arr.ndim)]
                 data_vars[k] = _xr.DataArray(arr, dims=dims)
             ds = _xr.Dataset(data_vars)
