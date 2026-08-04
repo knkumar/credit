@@ -40,6 +40,8 @@ class HierarchicalMMM:
         holdout_fraction: float = 0.2,
         interaction_graph: Optional[InteractionGraph] = None,
     ) -> None:
+        if not (0.0 <= holdout_fraction < 1.0):
+            raise ValueError("holdout_fraction must be in [0.0, 1.0)")
         self.priors = priors or PriorConfig()
         self.n_fourier_pairs = n_fourier_pairs
         self.holdout_fraction = holdout_fraction
@@ -86,8 +88,15 @@ class HierarchicalMMM:
 
         T = len(data.times)
 
+        # Holdout mask
+        n_holdout = int(T * self.holdout_fraction)
+        train_mask = np.ones(T, dtype=bool)
+        if n_holdout > 0:
+            train_mask[-n_holdout:] = False
+        self._train_mask = train_mask
+
         # Scale media per-channel by panel max
-        media_max = media_array.max(axis=(0, 1), keepdims=True)  # [1, 1, C]
+        media_max = media_array[train_mask].max(axis=(0, 1), keepdims=True)  # [1, 1, C]
         self._media_max = media_max[0, 0, :]  # [C] — per-channel panel max spend
         media_scaled = media_array / np.maximum(media_max, 1e-8)
 
@@ -106,13 +115,6 @@ class HierarchicalMMM:
             n_pairs=self.n_fourier_pairs,
         ).astype(np.float64)
 
-        # Holdout mask
-        n_holdout = int(T * self.holdout_fraction)
-        train_mask = np.ones(T, dtype=bool)
-        if n_holdout > 0:
-            train_mask[-n_holdout:] = False
-        self._train_mask = train_mask
-
         logger.info(
             "build_model: T=%d, G=%d, K=%d, C=%d, holdout=%d",
             T, len(data.geos), len(data.kpis), len(data.channels), n_holdout,
@@ -124,11 +126,11 @@ class HierarchicalMMM:
             likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
                 from scipy.special import logit
-                p = np.nan_to_num(np.nanmean(obs_array[:, :, k] / np.maximum(pop_array[:, :, k], 1.0), axis=0), nan=0.0)
+                p = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k] / np.maximum(pop_array[train_mask, :, k], 1.0), axis=0), nan=0.0)
                 p = np.clip(p, 1e-4, 1.0 - 1e-4)
                 obs_mean_log[k, :] = logit(p)
             else:
-                obs_mean = np.nan_to_num(np.nanmean(obs_array[:, :, k], axis=0), nan=0.0)
+                obs_mean = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k], axis=0), nan=0.0)
                 obs_mean_log[k, :] = np.log(np.maximum(obs_mean, 1e-8))
 
         # Store for use in fit()
