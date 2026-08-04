@@ -129,7 +129,7 @@ class HierarchicalMMM:
                 obs_mean_log[k, :] = logit(p)
             else:
                 obs_mean = np.nanmean(obs_array[:, :, k], axis=0)
-                obs_mean_log[k, :] = np.log(np.maximum(obs_mean, 1.0))
+                obs_mean_log[k, :] = np.log(np.maximum(obs_mean, 1e-8))
 
         # Store for use in fit()
         self._obs_array = obs_array
@@ -261,9 +261,10 @@ class HierarchicalMMM:
             kwargs.setdefault("progressbar", False)
             # Extract n before passing to pm.fit; don't forward it to approx.sample
             n = kwargs.pop("n", 10000)
+            draws = kwargs.pop("draws", 200)
             with model:
                 approx = pm.fit(n=n, **kwargs)
-                trace = approx.sample(draws=200)
+                trace = approx.sample(draws=draws)
             return MMMFit(trace=trace, map_params=None, model=model, data=data, _mmm=self, calibration_targets=self._calibration_targets)
 
         elif mode == "map":

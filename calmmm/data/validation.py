@@ -31,6 +31,7 @@ def validate_mmmdata(dataset: MMMData) -> ValidationResult:
     _check_duplicate_panel_rows(dataset, result)
     _check_negative_spend(dataset, result)
     _check_missing_outcomes(dataset, result)
+    _check_missing_features(dataset, result)
     _check_count_kpi_integrity(dataset, result)
     _check_binomial_kpi_has_population(dataset, result)
     _check_binomial_not_exceeds_population(dataset, result)
@@ -77,6 +78,18 @@ def _check_missing_outcomes(dataset: MMMData, result: ValidationResult) -> None:
             f"Incomplete media panel: expected {expected_media_len} rows "
             f"but found {len(dataset.media)}. Please provide balanced panel data."
         )
+
+
+def _check_missing_features(dataset: MMMData, result: ValidationResult) -> None:
+    if dataset.media is not None and "spend" in dataset.media.columns:
+        if dataset.media["spend"].isna().any():
+            missing = int(dataset.media["spend"].isna().sum())
+            result.errors.append(f"Missing spend values: {missing} rows have NaN spend in media data")
+    
+    if dataset.controls is not None and "value" in dataset.controls.columns:
+        if dataset.controls["value"].isna().any():
+            missing = int(dataset.controls["value"].isna().sum())
+            result.errors.append(f"Missing control values: {missing} rows have NaN value in controls data")
 
 
 def _check_count_kpi_integrity(dataset: MMMData, result: ValidationResult) -> None:
