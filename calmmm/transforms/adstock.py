@@ -43,6 +43,12 @@ def weibull_adstock(
     shape: Weibull shape parameter (k), must be > 0
     scale: Weibull scale parameter (lambda), must be > 0
     n_lags: number of lag periods (default 13 = one quarter at weekly frequency)
+
+    Note: This function is not currently used by the model (which uses
+    geometric adstock via ``geometric_adstock_pt``). It is provided for
+    experimentation with alternative adstock kernels. There is no PyTensor
+    counterpart; one would need to be written before using Weibull adstock
+    in the PyMC model.
     """
     if shape <= 0:
         raise ValueError(f"shape must be > 0, got {shape}")

@@ -9,6 +9,10 @@ class MediaScaler:
 
     Stores the max so that model-space predictions can be converted back to
     spend units via inverse_transform.
+
+    Note: The model currently performs its own inline scaling in
+    ``HierarchicalMMM.build_model()`` (calmmm/model/mmm.py). This class is
+    retained as a public utility for user-side pre/post-processing workflows.
     """
 
     def __init__(self) -> None:

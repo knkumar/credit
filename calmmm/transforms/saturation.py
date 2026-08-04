@@ -40,6 +40,10 @@ def ispline_basis(x: np.ndarray, n_knots: int = 4, degree: int = 3) -> np.ndarra
     degree: B-spline degree (3 = cubic)
 
     Returns array of shape (len(x), n_basis) where n_basis = n_knots + degree - 1.
+
+    Note: This function is not currently used by the model (which uses the
+    parametric Hill curve). It is provided for future non-parametric saturation
+    curve experiments.
     """
     from scipy.interpolate import BSpline  # lazy import — scipy is optional at module load time
 
