@@ -189,6 +189,13 @@ def fit_kwargs(args: argparse.Namespace) -> dict:
 
 
 def fit_quality_table(metrics: dict[str, float], *, window: str = "train") -> pd.DataFrame:
+    """Convert a {metric_kpi: value} dict into a tidy DataFrame.
+
+    Assumes metric names follow the pattern ``<metric>_<kpi>`` where ``<metric>``
+    is a short prefix (e.g. ``rmse``, ``r2``) and ``<kpi>`` is the KPI name.
+    The split is performed on the first underscore only, so KPI names containing
+    underscores (e.g. ``funded_revenue``) are handled correctly.
+    """
     rows = []
     for name, value in metrics.items():
         metric, kpi = name.split("_", 1)
