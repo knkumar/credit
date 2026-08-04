@@ -86,6 +86,8 @@ class MMMData:
 
         df = df.copy()
         df[time] = pd.to_datetime(df[time])
+        if df[time].isna().any():
+            raise ValueError(f"Missing or unparseable dates found in column '{time}'")
 
         # Build observations: long format (one row per time x geo x kpi)
         # column order: time, geo, kpi, outcome, population
