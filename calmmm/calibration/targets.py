@@ -80,15 +80,24 @@ def build_calibration_targets(
     for exp in experiments:
         # Collect time indices in experiment window that fall in training
         window_filtered = []
+        expected_dates_in_panel = 0
         for abs_i, t in enumerate(times):
-            if exp.start_date <= t <= exp.end_date and abs_i in abs_to_filtered:
-                window_filtered.append(abs_to_filtered[abs_i])
+            if exp.start_date <= t <= exp.end_date:
+                expected_dates_in_panel += 1
+                if abs_i in abs_to_filtered:
+                    window_filtered.append(abs_to_filtered[abs_i])
 
         if not window_filtered:
             raise ValueError(
                 f"Experiment '{exp.test_id}' window "
                 f"[{exp.start_date.date()}, {exp.end_date.date()}] "
                 f"has no training time steps (all fall in holdout or outside panel)."
+            )
+            
+        if expected_dates_in_panel > len(window_filtered):
+            raise ValueError(
+                f"Experiment '{exp.test_id}' partially overlaps with the holdout window. "
+                "Experiments must fall entirely within the training set."
             )
 
         t_indices = np.array(window_filtered, dtype=int)
