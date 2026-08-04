@@ -88,7 +88,7 @@ class HierarchicalMMM:
 
         # Scale media per-channel by panel max
         media_max = media_array.max(axis=(0, 1), keepdims=True)  # [1, 1, C]
-        self._media_max = media_max.squeeze()  # [C] — per-channel panel max spend
+        self._media_max = media_max[0, 0, :]  # [C] — per-channel panel max spend
         media_scaled = media_array / np.maximum(media_max, 1e-8)
 
         # Fourier features: t = 0-based week index
