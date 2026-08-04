@@ -28,15 +28,27 @@ class ValidationResult:
 
 def validate_mmmdata(dataset: MMMData) -> ValidationResult:
     result = ValidationResult()
+    _check_unknown_likelihoods(dataset, result)
     _check_duplicate_panel_rows(dataset, result)
     _check_negative_spend(dataset, result)
     _check_missing_outcomes(dataset, result)
     _check_missing_features(dataset, result)
     _check_count_kpi_integrity(dataset, result)
+    _check_lognormal_kpi_integrity(dataset, result)
     _check_binomial_kpi_has_population(dataset, result)
     _check_binomial_not_exceeds_population(dataset, result)
     _check_weak_media_variation(dataset, result)
     return result
+
+
+def _check_unknown_likelihoods(dataset: MMMData, result: ValidationResult) -> None:
+    valid_likelihoods = {"gaussian", "lognormal", "negative_binomial", "binomial"}
+    for _, row in dataset.kpi_metadata.iterrows():
+        if row["likelihood"] not in valid_likelihoods:
+            result.errors.append(
+                f"KPI '{row['kpi']}' has unknown likelihood='{row['likelihood']}'. "
+                f"Valid likelihoods are: {valid_likelihoods}"
+            )
 
 
 def _check_duplicate_panel_rows(dataset: MMMData, result: ValidationResult) -> None:
@@ -117,6 +129,22 @@ def _check_count_kpi_integrity(dataset: MMMData, result: ValidationResult) -> No
                     f"KPI '{kpi}' has likelihood='{row['likelihood']}' but "
                     f"{int(neg_mask.sum())} negative outcome value(s) found. "
                     "Count likelihoods require non-negative values."
+                )
+
+
+def _check_lognormal_kpi_integrity(dataset: MMMData, result: ValidationResult) -> None:
+    for _, row in dataset.kpi_metadata.iterrows():
+        if row["likelihood"] == "lognormal":
+            kpi = row["kpi"]
+            obs = dataset.observations.loc[
+                dataset.observations["kpi"] == kpi, "outcome"
+            ].dropna()
+            non_pos_mask = obs <= 0
+            if non_pos_mask.any():
+                result.errors.append(
+                    f"KPI '{kpi}' has likelihood='lognormal' but "
+                    f"{int(non_pos_mask.sum())} zero or negative outcome value(s) found. "
+                    "Lognormal likelihood requires strictly positive values."
                 )
 
 
