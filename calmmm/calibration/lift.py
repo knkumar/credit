@@ -57,7 +57,15 @@ def compute_model_lift(
         mu_exp = mu_val[t][:, g, k]                              # [T_exp, G_exp]
         cc_total = cc_val[t][:, g, k, :][:, :, c].sum(axis=-1)  # [T_exp, G_exp]
 
-        lift_model = float((np.exp(mu_exp) - np.exp(mu_exp - cc_total)).sum())
+        kpi_name = fit.data.kpis[k]
+        likelihood = fit.data.kpi_metadata.loc[fit.data.kpi_metadata["kpi"] == kpi_name, "likelihood"].values[0]
+
+        if likelihood == "binomial":
+            from scipy.special import expit
+            pop_exp = fit._mmm._pop_array[fit._mmm._train_mask][t][:, g, k]
+            lift_model = float((expit(mu_exp) * pop_exp - expit(mu_exp - cc_total) * pop_exp).sum())
+        else:
+            lift_model = float((np.exp(mu_exp) - np.exp(mu_exp - cc_total)).sum())
         z_score = (lift_model - target.lift_obs) / target.se
 
         rows.append({

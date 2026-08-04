@@ -37,6 +37,15 @@ def _regression_metrics(
     for k, kpi in enumerate(kpis):
         y_true = observed[:, :, k].ravel()
         y_pred = predicted[:, :, k].ravel()
+        valid = ~np.isnan(y_true) & ~np.isnan(y_pred)
+        y_true = y_true[valid]
+        y_pred = y_pred[valid]
+        
+        if len(y_true) == 0:
+            metrics[f"rmse_{kpi}"] = np.nan
+            metrics[f"r2_{kpi}"] = np.nan
+            continue
+            
         residual = y_true - y_pred
         sse = float(np.sum(residual**2))
         centered = y_true - float(np.mean(y_true))
@@ -203,44 +212,65 @@ class MMMFit:
 
         obs_holdout = mmm._obs_array[holdout_mask]  # [T_holdout, G, K]
 
-        # Build a full-T model (no holdout) to evaluate mu over all time steps
-        full_mmm = mmm.__class__(
-            priors=mmm.priors,
-            n_fourier_pairs=mmm.n_fourier_pairs,
-            holdout_fraction=0.0,
-            interaction_graph=mmm.interaction_graph,
-        )
-        full_model = full_mmm.build_model(mmm._data)
+        # Update data in the existing model to evaluate mu over all time steps
+        full_model = self.model
+        with full_model:
+            pm.set_data({
+                "X_media": mmm._media_scaled,
+                "fourier_features": mmm._fourier_matrix,
+                "obs_array": mmm._obs_array,
+                "pop_array": mmm._pop_array,
+            })
+            if getattr(mmm, "_ctrl_array", None) is not None:
+                pm.set_data({"ctrl_array": mmm._ctrl_array})
 
-        if self.map_params is not None:
-            # Evaluate mu on the full-T model using the *trained* parameter values.
-            # model.initial_point() gives the key set for all free (latent) RVs in the
-            # transformed space — the same format find_MAP() returns.  Filtering
-            # map_params to these keys excludes deterministics (mu, channel_contrib,
-            # scale_kpi, …) which would cause "too many parameters" in compile_fn.
-            latent_init = full_model.initial_point()
-            latent_params = {k: self.map_params[k] for k in latent_init if k in self.map_params}
+        try:
+            if self.map_params is not None:
+                # Evaluate mu on the full-T model using the *trained* parameter values.
+                latent_init = full_model.initial_point()
+                latent_params = {k: self.map_params[k] for k in latent_init if k in self.map_params}
+                with full_model:
+                    fn = full_model.compile_fn(full_model["mu"])
+                    mu_val = fn(latent_params)
+                mu_holdout = np.array(mu_val)[holdout_mask]
+    
+            elif self.trace is not None:
+                with full_model:
+                    ppc = pm.sample_posterior_predictive(
+                        self.trace,
+                        var_names=["mu"],
+                        progressbar=False,
+                        predictions=True,
+                    )
+                if hasattr(ppc, "predictions"):
+                    mu_samples = ppc.predictions["mu"].values
+                else:
+                    mu_samples = ppc.posterior_predictive["mu"].values
+                mu_holdout = mu_samples.mean(axis=(0, 1))[holdout_mask]  # [T_holdout, G, K]
+    
+            else:
+                raise ValueError("No params or trace available for prediction.")
+        finally:
             with full_model:
-                fn = full_model.compile_fn(full_model["mu"])
-                mu_val = fn(latent_params)
-            mu_holdout = np.array(mu_val)[holdout_mask]
+                pm.set_data({
+                    "X_media": mmm._media_scaled[mmm._train_mask],
+                    "fourier_features": mmm._fourier_matrix[mmm._train_mask],
+                    "obs_array": mmm._obs_array[mmm._train_mask],
+                    "pop_array": mmm._pop_array[mmm._train_mask],
+                })
+                if getattr(mmm, "_ctrl_array", None) is not None:
+                    pm.set_data({"ctrl_array": mmm._ctrl_array[mmm._train_mask]})
 
-        elif self.trace is not None:
-            with full_model:
-                ppc = pm.sample_posterior_predictive(
-                    self.trace,
-                    var_names=["mu"],
-                    progressbar=False,
-                )
-            # ppc.posterior_predictive["mu"]: [chains, draws, T, G, K]
-            mu_samples = ppc.posterior_predictive["mu"].values
-            mu_holdout = mu_samples.mean(axis=(0, 1))[holdout_mask]  # [T_holdout, G, K]
-
-        else:
-            raise ValueError("No params or trace available for prediction.")
-
-        # mu is on log scale → exp to get predicted mean
-        pred_mean = np.exp(mu_holdout)  # [T_holdout, G, K]
+        # Apply inverse link to get predicted mean
+        pred_mean = np.zeros_like(mu_holdout)  # [T_holdout, G, K]
+        for k, kpi in enumerate(mmm._data.kpis):
+            likelihood = mmm._data.kpi_metadata.loc[mmm._data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+            if likelihood == "binomial":
+                from scipy.special import expit
+                pop_k = mmm._pop_array[holdout_mask][:, :, k]
+                pred_mean[:, :, k] = expit(mu_holdout[:, :, k]) * pop_k
+            else:
+                pred_mean[:, :, k] = np.exp(mu_holdout[:, :, k])
 
         return _regression_metrics(obs_holdout, pred_mean, mmm._data.kpis)
 
@@ -259,7 +289,16 @@ class MMMFit:
 
         mu, _channel_contrib = eval_mu_and_channel_contrib(self)
         observed = mmm._obs_array[mmm._train_mask]
-        predicted = np.exp(mu)
+        
+        predicted = np.zeros_like(mu)
+        for k, kpi in enumerate(self.data.kpis):
+            likelihood = self.data.kpi_metadata.loc[self.data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+            if likelihood == "binomial":
+                from scipy.special import expit
+                pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
+                predicted[:, :, k] = expit(mu[:, :, k]) * pop_k
+            else:
+                predicted[:, :, k] = np.exp(mu[:, :, k])
         return _regression_metrics(observed, predicted, self.data.kpis)
 
     def mcmc_diagnostics(self, var_names: list[str] | None = None) -> pd.DataFrame:

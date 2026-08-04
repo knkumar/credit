@@ -191,9 +191,17 @@ class IncrementalityTests:
 
         experiments = []
         for i, row in df.iterrows():
-            se = float(row[standard_error]) if standard_error and standard_error in df.columns else None
-            ci_lo = float(row[ci_lower]) if ci_lower and ci_lower in df.columns else None
-            ci_hi = float(row[ci_upper]) if ci_upper and ci_upper in df.columns else None
+            se = float(row[standard_error]) if standard_error and standard_error in df.columns and pd.notna(row[standard_error]) else None
+            ci_lo = float(row[ci_lower]) if ci_lower and ci_lower in df.columns and pd.notna(row[ci_lower]) else None
+            ci_hi = float(row[ci_upper]) if ci_upper and ci_upper in df.columns and pd.notna(row[ci_upper]) else None
+
+            test_id = str(row["test_id"]) if "test_id" in df.columns else f"exp_{i}"
+
+            if se is None:
+                if ci_lo is not None and ci_hi is not None:
+                    se = (ci_hi - ci_lo) / (2 * 1.96)
+                else:
+                    raise ValueError(f"Missing standard error (se) for experiment '{test_id}', and unable to impute because ci_lower or ci_upper is missing.")
 
             channel_val = row[channel]
             channels = (
@@ -209,7 +217,7 @@ class IncrementalityTests:
                 else [str(geo_val)]
             )
 
-            test_id = str(row["test_id"]) if "test_id" in df.columns else f"exp_{i}"
+
 
             exp = ExperimentRow(
                 test_id=test_id,

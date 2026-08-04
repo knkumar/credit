@@ -129,6 +129,15 @@ class HierarchicalMMM:
         ctrl_train = ctrl_array[train_mask] if ctrl_array is not None else None  # [T_train, G, N] or None
 
         with pm.Model(coords=coords) as model:
+            # Wrap inputs in Data to avoid recompilation
+            X_media_train_data = pm.Data("X_media", X_media_train, dims=("time", "geo", "channel"))
+            fourier_train_data = pm.Data("fourier_features", fourier_train, dims=("time", "fourier"))
+            obs_train_data = pm.Data("obs_array", obs_train, dims=("time", "geo", "kpi"))
+            pop_train_data = pm.Data("pop_array", pop_train, dims=("time", "geo", "kpi"))
+            
+            ctrl_train_data = None
+            if ctrl_train is not None:
+                ctrl_train_data = pm.Data("ctrl_array", ctrl_train, dims=("time", "geo", "control"))
             # Adstock params
             decay = pm.Beta(
                 "adstock_decay",
@@ -138,7 +147,7 @@ class HierarchicalMMM:
             )
             # Adstock transform
             X_adstocked = geometric_adstock_pt(
-                pt.as_tensor_variable(X_media_train), decay
+                X_media_train_data, decay
             )  # [T_train, G, C]
 
             # Saturation params
@@ -152,7 +161,7 @@ class HierarchicalMMM:
             X_sat = hill_saturation_pt(X_adstocked, hill_alpha, hill_k)  # [T_train, G, C]
 
             # Baseline
-            baseline = _build_baseline(fourier_train, obs_mean_log, self.priors, ctrl_train)
+            baseline = _build_baseline(fourier_train_data, obs_mean_log, self.priors, ctrl_train_data)
 
             # Media hierarchy, with optional channel-to-channel interactions
             apply_interactions = None
@@ -169,7 +178,7 @@ class HierarchicalMMM:
 
             # Observation likelihoods (train only)
             _add_likelihood(
-                mu, obs_train, pop_train,
+                mu, obs_train_data, pop_train_data,
                 data.kpi_metadata, data.kpis, self.priors
             )
 
@@ -178,7 +187,12 @@ class HierarchicalMMM:
         if experiments is not None:
             targets = build_calibration_targets(experiments, data, self._train_mask)
             with model:
-                add_calibration_likelihood(model, targets)
+                add_calibration_likelihood(
+                    model, targets,
+                    kpi_metadata=data.kpi_metadata,
+                    kpis=data.kpis,
+                    pop_array=pop_train_data,
+                )
             self._calibration_targets = targets
         else:
             self._calibration_targets = []

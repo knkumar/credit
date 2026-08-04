@@ -54,9 +54,20 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
 
     T, G, K, C = cc_val.shape
 
-    exp_mu = np.exp(mu_val)                   # [T, G, K]
     cc_sum = cc_val.sum(axis=-1)              # [T, G, K]
-    baseline_contrib = np.exp(mu_val - cc_sum)  # [T, G, K]
+
+    exp_mu = np.zeros_like(mu_val)            # [T, G, K]
+    baseline_contrib = np.zeros_like(mu_val)  # [T, G, K]
+    for k, kpi in enumerate(kpis):
+        likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+        if likelihood == "binomial":
+            from scipy.special import expit
+            pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
+            exp_mu[:, :, k] = expit(mu_val[:, :, k]) * pop_k
+            baseline_contrib[:, :, k] = expit(mu_val[:, :, k] - cc_sum[:, :, k]) * pop_k
+        else:
+            exp_mu[:, :, k] = np.exp(mu_val[:, :, k])
+            baseline_contrib[:, :, k] = np.exp(mu_val[:, :, k] - cc_sum[:, :, k])
     total_media = exp_mu - baseline_contrib   # [T, G, K]
 
     # Guard against Σcc == 0 (no media spend → channel shares are undefined)
@@ -129,7 +140,15 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
 
     T, G, K, C = cc_val.shape
 
-    exp_mu = np.exp(mu_val)  # [T, G, K]
+    exp_mu = np.zeros_like(mu_val)  # [T, G, K]
+    for k, kpi in enumerate(kpis):
+        likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+        if likelihood == "binomial":
+            from scipy.special import expit
+            pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
+            exp_mu[:, :, k] = expit(mu_val[:, :, k]) * pop_k
+        else:
+            exp_mu[:, :, k] = np.exp(mu_val[:, :, k])
 
     n_cells = T * G * K
 
@@ -151,7 +170,15 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
     channel_contribs = []
     for ci in range(C):
         cc_c = cc_val[:, :, :, ci]
-        contrib_c = exp_mu - np.exp(mu_val - cc_c)
+        contrib_c = np.zeros_like(mu_val)
+        for k, kpi in enumerate(kpis):
+            likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+            if likelihood == "binomial":
+                from scipy.special import expit
+                pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
+                contrib_c[:, :, k] = exp_mu[:, :, k] - (expit(mu_val[:, :, k] - cc_c[:, :, k]) * pop_k)
+            else:
+                contrib_c[:, :, k] = exp_mu[:, :, k] - np.exp(mu_val[:, :, k] - cc_c[:, :, k])
         channel_contribs.append(contrib_c.ravel())
 
     all_contributions = np.concatenate(channel_contribs)

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
+import pandas as pd
 import pymc as pm
 import pytensor.tensor as pt
 
@@ -12,6 +14,9 @@ if TYPE_CHECKING:
 def add_calibration_likelihood(
     model: pm.Model,
     targets: list["CalibrationTarget"],
+    kpi_metadata: pd.DataFrame,
+    kpis: list[str],
+    pop_array: np.ndarray,
 ) -> None:
     """
     Add one pm.Normal calibration likelihood node per target to the current model.
@@ -61,7 +66,14 @@ def add_calibration_likelihood(
         mu_cf = mu_exp - cc_exp  # [T_exp, G_exp]
 
         # Lift = sum of (factual outcome - counterfactual outcome) over window
-        lift_model = (pt.exp(mu_exp) - pt.exp(mu_cf)).sum()
+        kpi_name = kpis[k]
+        likelihood = kpi_metadata.loc[kpi_metadata["kpi"] == kpi_name, "likelihood"].values[0]
+
+        if likelihood == "binomial":
+            pop_exp = pt.as_tensor_variable(pop_array)[t][:, g, k]
+            lift_model = (pm.math.sigmoid(mu_exp) * pop_exp - pm.math.sigmoid(mu_cf) * pop_exp).sum()
+        else:
+            lift_model = (pt.exp(mu_exp) - pt.exp(mu_cf)).sum()
 
         cal_lik = target.calibration_likelihood
         if cal_lik == "normal":

@@ -10,10 +10,10 @@ from calmmm.model.priors import PriorConfig
 
 
 def _build_baseline(
-    fourier_matrix: np.ndarray,
+    fourier_matrix: np.ndarray | pt.TensorVariable,
     obs_mean_log: np.ndarray,
     priors: PriorConfig,
-    ctrl_array: np.ndarray | None = None,
+    ctrl_array: np.ndarray | pt.TensorVariable | None = None,
 ) -> pt.TensorVariable:
     """
     Baseline = per-(KPI, geo) intercept + Fourier seasonality + optional controls.
@@ -52,7 +52,7 @@ def _build_baseline(
     fourier_contrib = pt.dot(fourier_matrix, fourier_beta.T)[:, None, :]
     baseline = intercept_tgk + fourier_contrib  # [T, G, K]
 
-    if ctrl_array is not None and ctrl_array.shape[-1] > 0:
+    if ctrl_array is not None:
         beta_control = pm.Normal(
             "beta_control",
             mu=0.0,
@@ -146,8 +146,8 @@ def _build_media_hierarchy(
 
 def _add_likelihood(
     mu: pt.TensorVariable,
-    obs_array: np.ndarray,
-    pop_array: np.ndarray,
+    obs_array: np.ndarray | pt.TensorVariable,
+    pop_array: np.ndarray | pt.TensorVariable,
     kpi_metadata,
     kpis: list[str],
     priors: PriorConfig,
@@ -192,14 +192,9 @@ def _add_likelihood(
 
         elif likelihood == "binomial":
             n_pop = pop_array[:, :, k]
-            if np.any(np.isnan(n_pop)):
-                raise ValueError(
-                    f"KPI '{kpi}' has likelihood='binomial' but population is NaN. "
-                    "Provide a population column in MMMData."
-                )
             pm.Binomial(
                 f"obs_{kpi}",
-                n=n_pop.astype(int),
+                n=pt.cast(n_pop, "int64"),
                 p=pm.math.sigmoid(mu_k),
                 observed=y_obs,
             )
