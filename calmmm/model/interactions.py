@@ -10,11 +10,14 @@ import pytensor.tensor as pt
 class ChannelInteraction:
     """
     One directed edge in a channel interaction graph: `source`'s signal
-    multiplicatively rescales `target`'s contribution.
+    multiplicatively rescales `target`'s contribution. This interaction acts
+    as an absolute magnitude scaler, meaning a positive interaction increases
+    the absolute magnitude of both synergistic (positive) and cannibalizing
+    (negative) baseline contributions.
 
     prior : "half_normal" (default) draws gamma ~ HalfNormal(prior_sigma) — boost-only,
-            contribution can only increase. "normal" draws gamma ~ Normal(0, prior_sigma) —
-            two-sided, for hypothesized suppression/cannibalization.
+            absolute magnitude can only increase. "normal" draws gamma ~ Normal(0, prior_sigma) —
+            two-sided, for hypothesized suppression/cannibalization (decreases magnitude if negative).
     """
     source: str
     target: str
