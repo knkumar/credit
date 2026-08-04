@@ -124,11 +124,11 @@ class HierarchicalMMM:
             likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
                 from scipy.special import logit
-                p = np.nanmean(obs_array[:, :, k] / np.maximum(pop_array[:, :, k], 1.0), axis=0)
+                p = np.nan_to_num(np.nanmean(obs_array[:, :, k] / np.maximum(pop_array[:, :, k], 1.0), axis=0), nan=0.0)
                 p = np.clip(p, 1e-4, 1.0 - 1e-4)
                 obs_mean_log[k, :] = logit(p)
             else:
-                obs_mean = np.nanmean(obs_array[:, :, k], axis=0)
+                obs_mean = np.nan_to_num(np.nanmean(obs_array[:, :, k], axis=0), nan=0.0)
                 obs_mean_log[k, :] = np.log(np.maximum(obs_mean, 1e-8))
 
         # Store for use in fit()
