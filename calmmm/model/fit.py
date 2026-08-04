@@ -272,13 +272,13 @@ class MMMFit:
             likelihood = mmm._data.kpi_metadata.loc[mmm._data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
                 from scipy.special import expit
-                pop_k = mmm._pop_array[holdout_mask][:, :, k]
-                pred_mean[..., :, k] = expit(mu_holdout[..., :, k]) * pop_k
+                pop_k = mmm._pop_array[holdout_mask][..., k]
+                pred_mean[..., k] = expit(mu_holdout[..., k]) * pop_k
             else:
-                pred_mean[..., :, k] = np.exp(mu_holdout[..., :, k])
+                pred_mean[..., k] = np.exp(mu_holdout[..., k])
 
         if pred_mean.ndim > 3:
-            pred_mean = pred_mean.mean(axis=0)
+            pred_mean = np.nanmean(pred_mean, axis=0)
 
         return _regression_metrics(obs_holdout, pred_mean, mmm._data.kpis)
 
@@ -303,13 +303,13 @@ class MMMFit:
             likelihood = self.data.kpi_metadata.loc[self.data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
                 from scipy.special import expit
-                pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
-                predicted[..., :, :, k] = expit(mu[..., :, :, k]) * pop_k
+                pop_k = mmm._pop_array[mmm._train_mask][..., k]
+                predicted[..., k] = expit(mu[..., k]) * pop_k
             else:
-                predicted[..., :, :, k] = np.exp(mu[..., :, :, k])
+                predicted[..., k] = np.exp(mu[..., k])
                 
         if predicted.ndim > 3:
-            predicted = predicted.mean(axis=0)
+            predicted = np.nanmean(predicted, axis=0)
             
         return _regression_metrics(observed, predicted, self.data.kpis)
 
