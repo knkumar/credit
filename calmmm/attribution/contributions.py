@@ -96,14 +96,14 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
     channel_labels = np.repeat(np.array(["baseline"] + list(channels)), n_cells)
 
     # Contribution values: baseline block then C channel blocks
-    baseline_flat = (baseline_contrib.mean(axis=0) if is_mcmc else baseline_contrib).ravel()
+    baseline_flat = (baseline_contrib.mean(axis=0) if is_mcmc else baseline_contrib).flatten(order='C')
     channel_contribs = []
     for ci in range(C):
         cc_c = cc_val[..., ci]
         contrib_c = np.where(cc_sum == 0, 0.0, total_media * cc_c / safe_cc_sum)
         if is_mcmc:
             contrib_c = contrib_c.mean(axis=0)
-        channel_contribs.append(contrib_c.ravel())
+        channel_contribs.append(contrib_c.flatten(order='C'))
 
     all_contributions = np.concatenate([baseline_flat] + channel_contribs)
 
@@ -191,7 +191,7 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
                 contrib_c[..., :, k] = exp_mu[..., :, k] - np.exp(mu_val[..., :, k] - cc_c[..., :, k])
         if is_mcmc:
             contrib_c = contrib_c.mean(axis=0)
-        channel_contribs.append(contrib_c.ravel())
+        channel_contribs.append(contrib_c.flatten(order='C'))
 
     all_contributions = np.concatenate(channel_contribs)
 

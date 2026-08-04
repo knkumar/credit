@@ -72,6 +72,9 @@ def add_calibration_likelihood(
         if likelihood == "binomial":
             pop_exp = pt.as_tensor_variable(pop_array)[t][:, g, k]
             lift_model = (pm.math.sigmoid(mu_exp) * pop_exp - pm.math.sigmoid(mu_cf) * pop_exp).sum()
+        elif likelihood == "lognormal":
+            sigma_k = model[f"sigma_{kpi_name}"]
+            lift_model = (pt.exp(mu_exp + sigma_k**2 / 2.0) - pt.exp(mu_cf + sigma_k**2 / 2.0)).sum()
         else:
             lift_model = (pt.exp(mu_exp) - pt.exp(mu_cf)).sum()
 

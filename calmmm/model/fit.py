@@ -274,6 +274,17 @@ class MMMFit:
                 from scipy.special import expit
                 pop_k = mmm._pop_array[holdout_mask][..., k]
                 pred_mean[..., k] = expit(mu_holdout[..., k]) * pop_k
+            elif likelihood == "lognormal":
+                if self.map_params is not None and f"sigma_{kpi}" in self.map_params:
+                    sigma_val = self.map_params[f"sigma_{kpi}"]
+                elif self.trace is not None and f"sigma_{kpi}" in self.trace.posterior:
+                    sigma_samples = self.trace.posterior[f"sigma_{kpi}"].values
+                    sigma_val = sigma_samples.reshape(-1)
+                    while sigma_val.ndim < mu_holdout.ndim - 1:
+                        sigma_val = np.expand_dims(sigma_val, axis=-1)
+                else:
+                    sigma_val = 0.0
+                pred_mean[..., k] = np.exp(mu_holdout[..., k] + sigma_val**2 / 2.0)
             else:
                 pred_mean[..., k] = np.exp(mu_holdout[..., k])
 
@@ -305,6 +316,17 @@ class MMMFit:
                 from scipy.special import expit
                 pop_k = mmm._pop_array[mmm._train_mask][..., k]
                 predicted[..., k] = expit(mu[..., k]) * pop_k
+            elif likelihood == "lognormal":
+                if self.map_params is not None and f"sigma_{kpi}" in self.map_params:
+                    sigma_val = self.map_params[f"sigma_{kpi}"]
+                elif self.trace is not None and f"sigma_{kpi}" in self.trace.posterior:
+                    sigma_samples = self.trace.posterior[f"sigma_{kpi}"].values
+                    sigma_val = sigma_samples.reshape(-1)
+                    while sigma_val.ndim < mu.ndim - 1:
+                        sigma_val = np.expand_dims(sigma_val, axis=-1)
+                else:
+                    sigma_val = 0.0
+                predicted[..., k] = np.exp(mu[..., k] + sigma_val**2 / 2.0)
             else:
                 predicted[..., k] = np.exp(mu[..., k])
                 
