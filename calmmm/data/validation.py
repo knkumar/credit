@@ -59,21 +59,15 @@ def _check_negative_spend(dataset: MMMData, result: ValidationResult) -> None:
 
 
 def _check_missing_outcomes(dataset: MMMData, result: ValidationResult) -> None:
-    discrete_likelihoods = {"binomial", "negative_binomial"}
     for _, row in dataset.kpi_metadata.iterrows():
         kpi = row["kpi"]
-        is_discrete = row["likelihood"] in discrete_likelihoods
         kpi_obs = dataset.observations[dataset.observations["kpi"] == kpi]
         missing = int(kpi_obs["outcome"].isna().sum())
         if missing > 0:
-            if is_discrete:
-                result.errors.append(
-                    f"Missing outcome values for discrete KPI '{kpi}': PyMC cannot impute discrete data. {missing} missing values found."
-                )
-            else:
-                result.warnings.append(
-                    f"Missing outcome values for continuous KPI '{kpi}': {missing} rows have NaN outcome. PyMC will impute these."
-                )
+            result.errors.append(
+                f"Missing outcome values for KPI '{kpi}': {missing} missing values found. "
+                "PyMC imputation is no longer supported; please impute before modeling."
+            )
 
     expected_obs_len = dataset.n_times * dataset.n_geos * dataset.n_kpis
     if len(dataset.observations) != expected_obs_len:
@@ -116,6 +110,13 @@ def _check_count_kpi_integrity(dataset: MMMData, result: ValidationResult) -> No
                     f"KPI '{kpi}' has likelihood='{row['likelihood']}' but "
                     f"{int(non_int_mask.sum())} non-integer outcome value(s) found. "
                     "Count likelihoods require whole numbers."
+                )
+            neg_mask = obs < 0
+            if neg_mask.any():
+                result.errors.append(
+                    f"KPI '{kpi}' has likelihood='{row['likelihood']}' but "
+                    f"{int(neg_mask.sum())} negative outcome value(s) found. "
+                    "Count likelihoods require non-negative values."
                 )
 
 
