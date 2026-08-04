@@ -147,6 +147,7 @@ class HierarchicalMMM:
         pop_train = pop_array[train_mask]              # [T_train, G, K]
         ctrl_train = ctrl_array[train_mask] if ctrl_array is not None else None  # [T_train, G, N] or None
 
+        coords["time"] = [t for i, t in enumerate(data.times) if train_mask[i]]
         with pm.Model(coords=coords) as model:
             # Wrap inputs in Data to avoid recompilation
             X_media_train_data = pm.Data("X_media", X_media_train, dims=("time", "geo", "channel"))

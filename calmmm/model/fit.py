@@ -224,7 +224,7 @@ class MMMFit:
                 "fourier_features": mmm._fourier_matrix,
                 "obs_array": mmm._obs_array,
                 "pop_array": mmm._pop_array,
-            })
+            }, coords={"time": mmm._data.times})
             if getattr(mmm, "_ctrl_array", None) is not None:
                 pm.set_data({"ctrl_array": mmm._ctrl_array})
 
@@ -262,7 +262,7 @@ class MMMFit:
                     "fourier_features": mmm._fourier_matrix[mmm._train_mask],
                     "obs_array": mmm._obs_array[mmm._train_mask],
                     "pop_array": mmm._pop_array[mmm._train_mask],
-                })
+                }, coords={"time": [t for i, t in enumerate(mmm._data.times) if mmm._train_mask[i]]})
                 if getattr(mmm, "_ctrl_array", None) is not None:
                     pm.set_data({"ctrl_array": mmm._ctrl_array[mmm._train_mask]})
 
