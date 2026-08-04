@@ -20,4 +20,6 @@ def fourier_features(
         angle = 2.0 * np.pi * n * t / period
         cols.append(np.sin(angle))
         cols.append(np.cos(angle))
+    if not cols:
+        return np.empty((len(t), 0))
     return np.column_stack(cols)
