@@ -42,12 +42,19 @@ def build_controls_array(data: MMMData) -> tuple[np.ndarray | None, list[str]]:
     n_idx = {n: i for i, n in enumerate(ctrl_names)}
 
     ctrl_array = np.zeros((T, G, N), dtype=np.float64)
-    for _, row in data.controls.iterrows():
-        ti = t_idx.get(row["time"])
-        gi = g_idx.get(row["geo"])
-        ni = n_idx.get(row["control"])
-        if ti is not None and gi is not None and ni is not None:
-            ctrl_array[ti, gi, ni] = row["value"]
+
+    df = data.controls
+    ti = df["time"].map(t_idx).values
+    gi = df["geo"].map(g_idx).values
+    ni = df["control"].map(n_idx).values
+    # Filter out rows with unmapped keys (map returns NaN for missing)
+    valid = ~(np.isnan(ti) | np.isnan(gi) | np.isnan(ni))
+    ti = ti[valid].astype(int)
+    gi = gi[valid].astype(int)
+    ni = ni[valid].astype(int)
+    if len(set(zip(ti, gi, ni))) != len(ti):
+        raise ValueError("data.controls contains duplicate (time, geo, control) rows")
+    ctrl_array[ti, gi, ni] = df["value"].values[valid]
 
     return ctrl_array, ctrl_names
 
