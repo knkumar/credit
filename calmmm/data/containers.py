@@ -191,9 +191,15 @@ class IncrementalityTests:
 
         experiments = []
         for i, row in df.iterrows():
-            se = float(row[standard_error]) if standard_error and standard_error in df.columns and pd.notna(row[standard_error]) else None
-            ci_lo = float(row[ci_lower]) if ci_lower and ci_lower in df.columns and pd.notna(row[ci_lower]) else None
-            ci_hi = float(row[ci_upper]) if ci_upper and ci_upper in df.columns and pd.notna(row[ci_upper]) else None
+            def _parse_numeric(col_name):
+                if col_name and col_name in df.columns:
+                    val = pd.to_numeric(row[col_name], errors="coerce")
+                    return None if pd.isna(val) else float(val)
+                return None
+
+            se = _parse_numeric(standard_error)
+            ci_lo = _parse_numeric(ci_lower)
+            ci_hi = _parse_numeric(ci_upper)
 
             test_id = str(row["test_id"]) if "test_id" in df.columns else f"exp_{i}"
 
