@@ -137,12 +137,12 @@ def build_interaction_step(
                     signal = X_adstock[:, :, channel_idx[edge.source]][:, :, None]  # [T, G, 1]
 
                 if edge.prior == "half_normal":
-                    gamma = pm.HalfNormal(f"gamma_{edge.source}_{edge.target}", sigma=edge.prior_sigma)
+                    gamma = pm.HalfNormal(f"gamma_{edge.source}_{edge.target}", sigma=edge.prior_sigma, dims="kpi")
                     boost_signal = pt.maximum(signal, 0.0)
-                    contrib = contrib * (1.0 + gamma * boost_signal)
+                    contrib = contrib * (1.0 + gamma[None, None, :] * boost_signal)
                 else:  # "normal" — two-sided, exponential form guarantees strict positivity
-                    gamma = pm.Normal(f"gamma_{edge.source}_{edge.target}", mu=0.0, sigma=edge.prior_sigma)
-                    contrib = contrib * pt.exp(gamma * signal)
+                    gamma = pm.Normal(f"gamma_{edge.source}_{edge.target}", mu=0.0, sigma=edge.prior_sigma, dims="kpi")
+                    contrib = contrib * pt.exp(gamma[None, None, :] * signal)
 
             slices[name] = contrib
             chain_scales[name] = pt.mean(pt.abs(contrib)) + 1e-8
