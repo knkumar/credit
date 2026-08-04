@@ -171,8 +171,9 @@ class MMMFit:
                     _mmm=mmm,
                     calibration_targets=list(getattr(mmm, "_calibration_targets", [])),
                 )
-        except (ValueError, KeyError):
-            pass
+        except (ValueError, KeyError) as e:
+            import logging
+            logging.warning(f"Failed to load as arviz InferenceData: {e}. Falling back to xarray Dataset.")
 
         # Fall back to MAP params stored as a plain xarray Dataset.
         with _xr.open_dataset(path) as ds:
@@ -232,7 +233,8 @@ class MMMFit:
             if self.map_params is not None:
                 # Evaluate mu on the full-T model using the *trained* parameter values.
                 latent_init = full_model.initial_point()
-                latent_params = {k: self.map_params[k] for k in latent_init if k in self.map_params}
+                latent_params = latent_init.copy()
+                latent_params.update({k: v for k, v in self.map_params.items() if k in latent_params})
                 with full_model:
                     fn = full_model.compile_fn(full_model["mu"])
                     mu_val = fn(latent_params)
