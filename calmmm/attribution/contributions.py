@@ -69,6 +69,18 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
             pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
             exp_mu[..., :, k] = expit(mu_val[..., :, k]) * pop_k
             baseline_contrib[..., :, k] = expit(mu_val[..., :, k] - cc_sum[..., :, k]) * pop_k
+        elif likelihood == "lognormal":
+            if fit.map_params is not None and f"sigma_{kpi}" in fit.map_params:
+                sigma_val = fit.map_params[f"sigma_{kpi}"]
+            elif fit.trace is not None and f"sigma_{kpi}" in fit.trace.posterior:
+                sigma_samples = fit.trace.posterior[f"sigma_{kpi}"].values
+                sigma_val = sigma_samples.reshape(-1)
+                while sigma_val.ndim < mu_val.ndim - 1:
+                    sigma_val = np.expand_dims(sigma_val, axis=-1)
+            else:
+                sigma_val = 0.0
+            exp_mu[..., :, k] = np.exp(mu_val[..., :, k] + sigma_val**2 / 2.0)
+            baseline_contrib[..., :, k] = np.exp(mu_val[..., :, k] - cc_sum[..., :, k] + sigma_val**2 / 2.0)
         else:
             exp_mu[..., :, k] = np.exp(mu_val[..., :, k])
             baseline_contrib[..., :, k] = np.exp(mu_val[..., :, k] - cc_sum[..., :, k])
@@ -157,6 +169,17 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
             from scipy.special import expit
             pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
             exp_mu[..., :, k] = expit(mu_val[..., :, k]) * pop_k
+        elif likelihood == "lognormal":
+            if fit.map_params is not None and f"sigma_{kpi}" in fit.map_params:
+                sigma_val = fit.map_params[f"sigma_{kpi}"]
+            elif fit.trace is not None and f"sigma_{kpi}" in fit.trace.posterior:
+                sigma_samples = fit.trace.posterior[f"sigma_{kpi}"].values
+                sigma_val = sigma_samples.reshape(-1)
+                while sigma_val.ndim < mu_val.ndim - 1:
+                    sigma_val = np.expand_dims(sigma_val, axis=-1)
+            else:
+                sigma_val = 0.0
+            exp_mu[..., :, k] = np.exp(mu_val[..., :, k] + sigma_val**2 / 2.0)
         else:
             exp_mu[..., :, k] = np.exp(mu_val[..., :, k])
 
@@ -187,6 +210,17 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
                 from scipy.special import expit
                 pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
                 contrib_c[..., :, k] = exp_mu[..., :, k] - (expit(mu_val[..., :, k] - cc_c[..., :, k]) * pop_k)
+            elif likelihood == "lognormal":
+                if fit.map_params is not None and f"sigma_{kpi}" in fit.map_params:
+                    sigma_val = fit.map_params[f"sigma_{kpi}"]
+                elif fit.trace is not None and f"sigma_{kpi}" in fit.trace.posterior:
+                    sigma_samples = fit.trace.posterior[f"sigma_{kpi}"].values
+                    sigma_val = sigma_samples.reshape(-1)
+                    while sigma_val.ndim < mu_val.ndim - 1:
+                        sigma_val = np.expand_dims(sigma_val, axis=-1)
+                else:
+                    sigma_val = 0.0
+                contrib_c[..., :, k] = exp_mu[..., :, k] - np.exp(mu_val[..., :, k] - cc_c[..., :, k] + sigma_val**2 / 2.0)
             else:
                 contrib_c[..., :, k] = exp_mu[..., :, k] - np.exp(mu_val[..., :, k] - cc_c[..., :, k])
         if is_mcmc:
