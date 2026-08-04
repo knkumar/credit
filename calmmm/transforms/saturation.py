@@ -57,9 +57,9 @@ def ispline_basis(x: np.ndarray, n_knots: int = 4, degree: int = 3) -> np.ndarra
     interior_knots = np.percentile(x, quantiles)
 
     t = np.concatenate([
-        np.full(degree, x_min),
+        np.full(degree + 1, x_min),
         interior_knots,
-        np.full(degree, x_max),
+        np.full(degree + 1, x_max),
     ])
 
     n_basis = len(t) - degree - 1
