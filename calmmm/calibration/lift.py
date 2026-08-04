@@ -46,6 +46,7 @@ def compute_model_lift(
         return pd.DataFrame(columns=["test_id", "lift_model", "lift_obs", "se", "z_score"])
 
     mu_val, cc_val = _eval_mu_and_channel_contrib(fit)
+    is_mcmc = mu_val.ndim > 3
 
     rows = []
     for target in targets:
@@ -54,8 +55,12 @@ def compute_model_lift(
         k = target.k_index
         c = target.c_indices
 
-        mu_exp = mu_val[t][:, g, k]                              # [T_exp, G_exp]
-        cc_total = cc_val[t][:, g, k, :][:, :, c].sum(axis=-1)  # [T_exp, G_exp]
+        if is_mcmc:
+            mu_exp = mu_val[:, t][..., g, k]
+            cc_total = cc_val[:, t][..., g, k, :][..., c].sum(axis=-1)
+        else:
+            mu_exp = mu_val[t][:, g, k]
+            cc_total = cc_val[t][:, g, k, :][:, :, c].sum(axis=-1)
 
         kpi_name = fit.data.kpis[k]
         likelihood = fit.data.kpi_metadata.loc[fit.data.kpi_metadata["kpi"] == kpi_name, "likelihood"].values[0]
@@ -63,9 +68,11 @@ def compute_model_lift(
         if likelihood == "binomial":
             from scipy.special import expit
             pop_exp = fit._mmm._pop_array[fit._mmm._train_mask][t][:, g, k]
-            lift_model = float((expit(mu_exp) * pop_exp - expit(mu_exp - cc_total) * pop_exp).sum())
+            lifts = (expit(mu_exp) * pop_exp - expit(mu_exp - cc_total) * pop_exp).sum(axis=(-2, -1) if is_mcmc else None)
         else:
-            lift_model = float((np.exp(mu_exp) - np.exp(mu_exp - cc_total)).sum())
+            lifts = (np.exp(mu_exp) - np.exp(mu_exp - cc_total)).sum(axis=(-2, -1) if is_mcmc else None)
+            
+        lift_model = float(lifts.mean() if is_mcmc else lifts)
         z_score = (lift_model - target.lift_obs) / target.se
 
         rows.append({

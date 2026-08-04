@@ -43,8 +43,9 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
     mmm = fit._mmm
 
     mu_val, cc_val = _eval_params(fit)
-    # mu_val: [T_train, G, K]
-    # cc_val: [T_train, G, K, C]
+    is_mcmc = mu_val.ndim > 3
+    # mu_val: [S, T_train, G, K] or [T_train, G, K]
+    # cc_val: [S, T_train, G, K, C] or [T_train, G, K, C]
 
     train_mask = mmm._train_mask
     train_times = [t for t, m in zip(data.times, train_mask) if m]
@@ -52,23 +53,26 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
     kpis = data.kpis
     channels = data.channels
 
-    T, G, K, C = cc_val.shape
+    if is_mcmc:
+        S, T, G, K, C = cc_val.shape
+    else:
+        T, G, K, C = cc_val.shape
 
-    cc_sum = cc_val.sum(axis=-1)              # [T, G, K]
+    cc_sum = cc_val.sum(axis=-1)
 
-    exp_mu = np.zeros_like(mu_val)            # [T, G, K]
-    baseline_contrib = np.zeros_like(mu_val)  # [T, G, K]
+    exp_mu = np.zeros_like(mu_val)
+    baseline_contrib = np.zeros_like(mu_val)
     for k, kpi in enumerate(kpis):
         likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
         if likelihood == "binomial":
             from scipy.special import expit
             pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
-            exp_mu[:, :, k] = expit(mu_val[:, :, k]) * pop_k
-            baseline_contrib[:, :, k] = expit(mu_val[:, :, k] - cc_sum[:, :, k]) * pop_k
+            exp_mu[..., :, k] = expit(mu_val[..., :, k]) * pop_k
+            baseline_contrib[..., :, k] = expit(mu_val[..., :, k] - cc_sum[..., :, k]) * pop_k
         else:
-            exp_mu[:, :, k] = np.exp(mu_val[:, :, k])
-            baseline_contrib[:, :, k] = np.exp(mu_val[:, :, k] - cc_sum[:, :, k])
-    total_media = exp_mu - baseline_contrib   # [T, G, K]
+            exp_mu[..., :, k] = np.exp(mu_val[..., :, k])
+            baseline_contrib[..., :, k] = np.exp(mu_val[..., :, k] - cc_sum[..., :, k])
+    total_media = exp_mu - baseline_contrib
 
     # Guard against Σcc == 0 (no media spend → channel shares are undefined)
     safe_cc_sum = np.where(cc_sum == 0, 1.0, cc_sum)
@@ -92,11 +96,13 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
     channel_labels = np.repeat(np.array(["baseline"] + list(channels)), n_cells)
 
     # Contribution values: baseline block then C channel blocks
-    baseline_flat = baseline_contrib.ravel()
+    baseline_flat = (baseline_contrib.mean(axis=0) if is_mcmc else baseline_contrib).ravel()
     channel_contribs = []
     for ci in range(C):
-        cc_c = cc_val[:, :, :, ci]
+        cc_c = cc_val[..., ci]
         contrib_c = np.where(cc_sum == 0, 0.0, total_media * cc_c / safe_cc_sum)
+        if is_mcmc:
+            contrib_c = contrib_c.mean(axis=0)
         channel_contribs.append(contrib_c.ravel())
 
     all_contributions = np.concatenate([baseline_flat] + channel_contribs)
@@ -131,6 +137,7 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
     mmm = fit._mmm
 
     mu_val, cc_val = _eval_params(fit)
+    is_mcmc = mu_val.ndim > 3
 
     train_mask = mmm._train_mask
     train_times = [t for t, m in zip(data.times, train_mask) if m]
@@ -138,17 +145,20 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
     kpis = data.kpis
     channels = data.channels
 
-    T, G, K, C = cc_val.shape
+    if is_mcmc:
+        S, T, G, K, C = cc_val.shape
+    else:
+        T, G, K, C = cc_val.shape
 
-    exp_mu = np.zeros_like(mu_val)  # [T, G, K]
+    exp_mu = np.zeros_like(mu_val)
     for k, kpi in enumerate(kpis):
         likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
         if likelihood == "binomial":
             from scipy.special import expit
             pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
-            exp_mu[:, :, k] = expit(mu_val[:, :, k]) * pop_k
+            exp_mu[..., :, k] = expit(mu_val[..., :, k]) * pop_k
         else:
-            exp_mu[:, :, k] = np.exp(mu_val[:, :, k])
+            exp_mu[..., :, k] = np.exp(mu_val[..., :, k])
 
     n_cells = T * G * K
 
@@ -169,16 +179,18 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
 
     channel_contribs = []
     for ci in range(C):
-        cc_c = cc_val[:, :, :, ci]
+        cc_c = cc_val[..., ci]
         contrib_c = np.zeros_like(mu_val)
         for k, kpi in enumerate(kpis):
             likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
                 from scipy.special import expit
                 pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
-                contrib_c[:, :, k] = exp_mu[:, :, k] - (expit(mu_val[:, :, k] - cc_c[:, :, k]) * pop_k)
+                contrib_c[..., :, k] = exp_mu[..., :, k] - (expit(mu_val[..., :, k] - cc_c[..., :, k]) * pop_k)
             else:
-                contrib_c[:, :, k] = exp_mu[:, :, k] - np.exp(mu_val[:, :, k] - cc_c[:, :, k])
+                contrib_c[..., :, k] = exp_mu[..., :, k] - np.exp(mu_val[..., :, k] - cc_c[..., :, k])
+        if is_mcmc:
+            contrib_c = contrib_c.mean(axis=0)
         channel_contribs.append(contrib_c.ravel())
 
     all_contributions = np.concatenate(channel_contribs)

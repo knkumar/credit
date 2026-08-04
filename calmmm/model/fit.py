@@ -14,16 +14,19 @@ if TYPE_CHECKING:
 
 
 def eval_mu_and_channel_contrib(fit: "MMMFit"):
-    """Return (mu [T,G,K], channel_contrib [T,G,K,C]) as numpy arrays."""
+    """Return (mu, channel_contrib) as numpy arrays. 
+    Shape [S, T, G, K] and [S, T, G, K, C] for traces, or [T, G, K] and [T, G, K, C] for MAP."""
     if fit.map_params is not None:
         return (
             np.array(fit.map_params["mu"]),
             np.array(fit.map_params["channel_contrib"]),
         )
     if fit.trace is not None:
+        mu = fit.trace.posterior["mu"].values
+        cc = fit.trace.posterior["channel_contrib"].values
         return (
-            fit.trace.posterior["mu"].values.mean(axis=(0, 1)),
-            fit.trace.posterior["channel_contrib"].values.mean(axis=(0, 1)),
+            mu.reshape(-1, *mu.shape[2:]),
+            cc.reshape(-1, *cc.shape[2:]),
         )
     raise ValueError("MMMFit has neither map_params nor trace.")
 
@@ -246,7 +249,8 @@ class MMMFit:
                     mu_samples = ppc.predictions["mu"].values
                 else:
                     mu_samples = ppc.posterior_predictive["mu"].values
-                mu_holdout = mu_samples.mean(axis=(0, 1))[holdout_mask]  # [T_holdout, G, K]
+                mu_samples = mu_samples.reshape(-1, *mu_samples.shape[2:])
+                mu_holdout = mu_samples[:, holdout_mask, ...]  # [S, T_holdout, G, K]
     
             else:
                 raise ValueError("No params or trace available for prediction.")
@@ -262,15 +266,18 @@ class MMMFit:
                     pm.set_data({"ctrl_array": mmm._ctrl_array[mmm._train_mask]})
 
         # Apply inverse link to get predicted mean
-        pred_mean = np.zeros_like(mu_holdout)  # [T_holdout, G, K]
+        pred_mean = np.zeros_like(mu_holdout)  # [S?, T_holdout, G, K]
         for k, kpi in enumerate(mmm._data.kpis):
             likelihood = mmm._data.kpi_metadata.loc[mmm._data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
                 from scipy.special import expit
                 pop_k = mmm._pop_array[holdout_mask][:, :, k]
-                pred_mean[:, :, k] = expit(mu_holdout[:, :, k]) * pop_k
+                pred_mean[..., :, k] = expit(mu_holdout[..., :, k]) * pop_k
             else:
-                pred_mean[:, :, k] = np.exp(mu_holdout[:, :, k])
+                pred_mean[..., :, k] = np.exp(mu_holdout[..., :, k])
+
+        if pred_mean.ndim > 3:
+            pred_mean = pred_mean.mean(axis=0)
 
         return _regression_metrics(obs_holdout, pred_mean, mmm._data.kpis)
 
@@ -296,9 +303,13 @@ class MMMFit:
             if likelihood == "binomial":
                 from scipy.special import expit
                 pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
-                predicted[:, :, k] = expit(mu[:, :, k]) * pop_k
+                predicted[..., :, :, k] = expit(mu[..., :, :, k]) * pop_k
             else:
-                predicted[:, :, k] = np.exp(mu[:, :, k])
+                predicted[..., :, :, k] = np.exp(mu[..., :, :, k])
+                
+        if predicted.ndim > 3:
+            predicted = predicted.mean(axis=0)
+            
         return _regression_metrics(observed, predicted, self.data.kpis)
 
     def mcmc_diagnostics(self, var_names: list[str] | None = None) -> pd.DataFrame:
