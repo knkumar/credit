@@ -185,9 +185,14 @@ class IncrementalityTests:
     ) -> "IncrementalityTests":
         def _per_row(value, row, cast):
             """If `value` names a column in `df`, read it per-row; otherwise use it as a literal for every row."""
-            if isinstance(value, str) and value in df.columns:
-                return cast(row[value])
-            return value
+            if isinstance(value, str):
+                if value in df.columns:
+                    return cast(row[value])
+                try:
+                    return cast(value)
+                except ValueError:
+                    pass
+            return cast(value)
 
         experiments = []
         for i, row in df.iterrows():
