@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
+import pandas as pd
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -139,7 +140,8 @@ def _check_lognormal_kpi_integrity(dataset: MMMData, result: ValidationResult) -
             obs = dataset.observations.loc[
                 dataset.observations["kpi"] == kpi, "outcome"
             ].dropna()
-            non_pos_mask = obs <= 0
+            obs_numeric = pd.to_numeric(obs, errors='coerce')
+            non_pos_mask = obs_numeric <= 0
             if non_pos_mask.any():
                 result.errors.append(
                     f"KPI '{kpi}' has likelihood='lognormal' but "

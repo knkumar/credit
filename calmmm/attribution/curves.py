@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import logging
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from calmmm.model.fit import MMMFit
@@ -77,9 +80,15 @@ def spend_response_report(
             np.interp(increased_spend, curve["spend"], curve["saturation"])
         )
         response_lift = increased_response - current_response
-        response_lift_pct = (
-            response_lift / current_response if current_response != 0 else np.nan
-        )
+        if current_response != 0.0:
+            response_lift_pct = response_lift / current_response
+        else:
+            logger.warning(
+                "Response lift percentage could not be calculated for channel %r "
+                "due to a zero baseline response.",
+                channel,
+            )
+            response_lift_pct = np.nan
 
         rows.append(
             {
