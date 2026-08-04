@@ -215,4 +215,4 @@ def test_build_interaction_step_half_normal_never_flips_sign_from_negative_chain
 
     social_idx = 2
     base_social = -2.0
-    assert np.all(val[:, :, :, social_idx] >= base_social - 1e-9)
+    assert np.all(val[:, :, :, social_idx] <= base_social + 1e-9)
