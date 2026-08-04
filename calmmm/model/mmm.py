@@ -96,7 +96,7 @@ class HierarchicalMMM:
         self._train_mask = train_mask
 
         # Scale media per-channel by panel max
-        media_max = media_array[train_mask].max(axis=(0, 1), keepdims=True)  # [1, 1, C]
+        media_max = media_array.max(axis=(0, 1), keepdims=True)  # [1, 1, C]
         self._media_max = media_max[0, 0, :]  # [C] — per-channel panel max spend
         media_scaled = media_array / np.maximum(media_max, 1e-8)
 
