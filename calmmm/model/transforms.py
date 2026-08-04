@@ -24,11 +24,12 @@ def geometric_adstock_pt(X, decay):
         return x_t + h_prev * decay_[None, :]
 
     h0 = pt.zeros_like(X[0])  # [G, C]
-    h_seq, _updates = pytensor.scan(
+    h_seq = pytensor.scan(
         _step,
         sequences=[X],
         outputs_info=[h0],
         non_sequences=[decay],
+        return_updates=False,
     )
     return h_seq  # [T, G, C]
 
