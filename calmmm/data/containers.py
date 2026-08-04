@@ -211,11 +211,14 @@ class IncrementalityTests:
             )
 
             geo_val = row[geo_scope]
-            geos = (
-                [g.strip() for g in geo_val.split(",")]
-                if isinstance(geo_val, str)
-                else [str(geo_val)]
-            )
+            if pd.isna(geo_val) or str(geo_val).strip() == "" or str(geo_val).strip().lower() == "nan":
+                geos = []
+            else:
+                geos = (
+                    [g.strip() for g in geo_val.split(",")]
+                    if isinstance(geo_val, str)
+                    else [str(geo_val)]
+                )
 
 
 
