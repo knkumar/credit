@@ -132,10 +132,10 @@ class HierarchicalMMM:
                 p = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k] / np.maximum(pop_array[train_mask, :, k], 1.0), axis=0), nan=0.0)
                 p = np.clip(p, 1e-4, 1.0 - 1e-4)
                 obs_mean_log[k, :] = logit(p)
+            elif likelihood == "lognormal":
+                obs_mean_log[k, :] = np.nan_to_num(np.nanmean(np.log(np.maximum(obs_array[train_mask, :, k], 1e-8)), axis=0))
             else:
                 obs_mean = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k], axis=0), nan=0.0)
-                # Note: For lognormal, mean = exp(mu + sigma^2 / 2). 
-                # We approximate initial log mean here without sigma adjustment.
                 obs_mean_log[k, :] = np.log(np.maximum(obs_mean, 1e-8))
 
         # Store for use in fit()
