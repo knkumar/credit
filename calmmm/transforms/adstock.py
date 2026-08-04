@@ -3,6 +3,10 @@ from __future__ import annotations
 import numpy as np
 
 
+# Pure-NumPy reference implementation. The differentiable PyTensor version
+# used inside the PyMC model is in calmmm/model/transforms.py.
+
+
 def geometric_adstock(x: np.ndarray, decay: float) -> np.ndarray:
     """
     Recursive geometric adstock: x_out[t] = x[t] + decay * x_out[t-1].

@@ -3,6 +3,10 @@ from __future__ import annotations
 import numpy as np
 
 
+# Pure-NumPy reference implementation. The differentiable PyTensor version
+# used inside the PyMC model is in calmmm/model/transforms.py.
+
+
 def hill_saturation(x: np.ndarray, alpha: float, K: float) -> np.ndarray:
     """
     Hill (power) saturation curve.
