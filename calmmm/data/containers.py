@@ -197,12 +197,6 @@ class IncrementalityTests:
 
             test_id = str(row["test_id"]) if "test_id" in df.columns else f"exp_{i}"
 
-            if se is None:
-                if ci_lo is not None and ci_hi is not None:
-                    se = (ci_hi - ci_lo) / (2 * 1.96)
-                else:
-                    raise ValueError(f"Missing standard error (se) for experiment '{test_id}', and unable to impute because ci_lower or ci_upper is missing.")
-
             channel_val = row[channel]
             channels = (
                 [c.strip() for c in channel_val.split(",")]
