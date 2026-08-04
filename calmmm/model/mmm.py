@@ -91,11 +91,19 @@ class HierarchicalMMM:
         self._media_max = media_max[0, 0, :]  # [C] — per-channel panel max spend
         media_scaled = media_array / np.maximum(media_max, 1e-8)
 
-        # Fourier features: t = 0-based week index
+        # Determine period from data times
+        if len(data.times) >= 2:
+            diffs = np.diff(data.times)
+            median_days = np.median([d.days for d in diffs])
+            period = 365.25 / max(median_days, 1.0)
+        else:
+            period = 52.0  # fallback
+
+        # Fourier features: t = 0-based index
         fourier_matrix = fourier_features(
             t=np.arange(T, dtype=float),
+            period=period,
             n_pairs=self.n_fourier_pairs,
-            period=52.0,
         ).astype(np.float64)
 
         # Holdout mask
