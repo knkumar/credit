@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 
 from calmmm.data.containers import MMMData
 
@@ -91,9 +92,16 @@ def build_arrays(
     ti = df["time"].map(t_idx).values
     gi = df["geo"].map(g_idx).values
     ki = df["kpi"].map(k_idx).values
-    if len(set(zip(ti, gi, ki))) != len(ti):
+    
+    # Filter valid rows and cast to int
+    valid = ~(pd.isna(ti) | pd.isna(gi) | pd.isna(ki))
+    ti_valid = ti[valid].astype(int)
+    gi_valid = gi[valid].astype(int)
+    ki_valid = ki[valid].astype(int)
+    
+    if len(set(zip(ti_valid, gi_valid, ki_valid))) != len(ti_valid):
         raise ValueError("data.observations contains duplicate (time, geo, kpi) rows")
-    obs_array[ti, gi, ki] = df["outcome"].values
+    obs_array[ti_valid, gi_valid, ki_valid] = df["outcome"].values[valid]
 
     # Media → [T, G, C]
     media_array = np.zeros((T, G, C))
@@ -101,15 +109,24 @@ def build_arrays(
     mti = mdf["time"].map(t_idx).values
     mgi = mdf["geo"].map(g_idx).values
     mci = mdf["channel"].map(c_idx).values
-    if len(set(zip(mti, mgi, mci))) != len(mti):
+    
+    valid_m = ~(pd.isna(mti) | pd.isna(mgi) | pd.isna(mci))
+    mti_valid = mti[valid_m].astype(int)
+    mgi_valid = mgi[valid_m].astype(int)
+    mci_valid = mci[valid_m].astype(int)
+
+    if len(set(zip(mti_valid, mgi_valid, mci_valid))) != len(mti_valid):
         raise ValueError("data.media contains duplicate (time, geo, channel) rows")
-    media_array[mti, mgi, mci] = mdf["spend"].values
+    media_array[mti_valid, mgi_valid, mci_valid] = mdf["spend"].values[valid_m]
 
     # Population → [T, G, K]  (reuses ti/gi/ki from observations pivot)
     pop_array = np.full((T, G, K), np.nan)
     if "population" in df.columns:
-        valid = df["population"].notna().values
-        pop_array[ti[valid], gi[valid], ki[valid]] = df["population"].to_numpy()[valid]
+        valid_pop = valid & df["population"].notna().values
+        ti_pop = ti[valid_pop].astype(int)
+        gi_pop = gi[valid_pop].astype(int)
+        ki_pop = ki[valid_pop].astype(int)
+        pop_array[ti_pop, gi_pop, ki_pop] = df["population"].to_numpy()[valid_pop]
 
     return (
         obs_array.astype(np.float64),
