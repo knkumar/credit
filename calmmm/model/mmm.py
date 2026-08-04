@@ -102,8 +102,9 @@ class HierarchicalMMM:
 
         # Determine period from data times
         if len(data.times) >= 2:
-            diffs = np.diff(data.times)
-            median_days = np.median([d.days for d in diffs])
+            import pandas as pd
+            diffs = pd.Series(data.times).diff().dropna()
+            median_days = diffs.dt.days.median()
             period = 365.25 / max(median_days, 1.0)
         else:
             period = 52.0  # fallback
