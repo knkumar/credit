@@ -16,14 +16,13 @@ class MediaScaler:
     """
 
     def __init__(self) -> None:
-        self._max: float | None = None
+        self._max: np.ndarray | None = None
 
     def fit_transform(self, spend: np.ndarray) -> np.ndarray:
         spend = np.asarray(spend, dtype=float)
-        self._max = float(spend.max())
-        if self._max == 0.0:
-            return np.zeros_like(spend)
-        return spend / self._max
+        self._max = np.asarray(spend.max(axis=tuple(range(spend.ndim - 1))))
+        safe_max = np.where(self._max == 0.0, 1.0, self._max)
+        return spend / safe_max
 
     def inverse_transform(self, scaled: np.ndarray) -> np.ndarray:
         if self._max is None:
@@ -31,7 +30,7 @@ class MediaScaler:
         return np.asarray(scaled, dtype=float) * self._max
 
     @property
-    def max_spend(self) -> float:
+    def max_spend(self) -> np.ndarray:
         if self._max is None:
             raise RuntimeError("MediaScaler is not fitted")
         return self._max
