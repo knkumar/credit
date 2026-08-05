@@ -57,9 +57,10 @@ def compute_roi(fit: "MMMFit") -> pd.DataFrame:
     )
 
     merged = total_contrib.merge(spend_by_channel, on="channel", how="left")
+    safe_spend = np.where(merged["total_spend"] == 0, 1.0, merged["total_spend"])
     merged["roi"] = np.where(
         merged["total_spend"] > 0,
-        merged["total_contribution"] / merged["total_spend"],
+        merged["total_contribution"] / safe_spend,
         np.nan,
     )
 
