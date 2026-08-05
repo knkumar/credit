@@ -85,6 +85,7 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
 
     # Guard against Σcc == 0 (no media spend → channel shares are undefined)
     safe_cc_sum = np.where(cc_sum == 0, 1.0, cc_sum)
+    media_ratio = np.where(cc_sum == 0, 0.0, total_media / safe_cc_sum)
 
     n_cells = T * G * K
 
@@ -109,10 +110,12 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
     channel_contribs = []
     for ci in range(C):
         cc_c = cc_val[..., ci]
-        contrib_c = np.where(cc_sum == 0, 0.0, total_media * cc_c / safe_cc_sum)
         if is_mcmc:
-            contrib_c = contrib_c.mean(axis=0)
-        channel_contribs.append(contrib_c.flatten(order='C'))
+            contrib_mean = (media_ratio * cc_c).mean(axis=0)
+            channel_contribs.append(contrib_mean.flatten(order='C'))
+        else:
+            contrib_c = media_ratio * cc_c
+            channel_contribs.append(contrib_c.flatten(order='C'))
 
     all_contributions = np.concatenate([baseline_flat] + channel_contribs)
 
@@ -191,20 +194,25 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
     channel_contribs = []
     for ci in range(C):
         cc_c = cc_val[..., ci]
-        contrib_c = np.empty_like(mu_val)
+        contrib_mean = np.empty((T, G, K), dtype=mu_val.dtype)
+        
         for k, kpi in enumerate(kpis):
             likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
                 pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
-                contrib_c[..., :, k] = exp_mu[..., :, k] - (expit(mu_val[..., :, k] - cc_c[..., :, k]) * pop_k)
+                val = exp_mu[..., :, k] - (expit(mu_val[..., :, k] - cc_c[..., :, k]) * pop_k)
             elif likelihood == "lognormal":
                 sigma_val = get_sigma_val(fit, kpi, mu_val.ndim)
-                contrib_c[..., :, k] = exp_mu[..., :, k] - np.exp(mu_val[..., :, k] - cc_c[..., :, k] + sigma_val**2 / 2.0)
+                val = exp_mu[..., :, k] - np.exp(mu_val[..., :, k] - cc_c[..., :, k] + sigma_val**2 / 2.0)
             else:
-                contrib_c[..., :, k] = exp_mu[..., :, k] - np.exp(mu_val[..., :, k] - cc_c[..., :, k])
-        if is_mcmc:
-            contrib_c = contrib_c.mean(axis=0)
-        channel_contribs.append(contrib_c.flatten(order='C'))
+                val = exp_mu[..., :, k] - np.exp(mu_val[..., :, k] - cc_c[..., :, k])
+            
+            if is_mcmc:
+                contrib_mean[..., k] = val.mean(axis=0)
+            else:
+                contrib_mean[..., k] = val
+                
+        channel_contribs.append(contrib_mean.flatten(order='C'))
 
     all_contributions = np.concatenate(channel_contribs)
 
