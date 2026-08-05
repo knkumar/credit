@@ -72,6 +72,9 @@ def spend_response_report(
 
         curve = saturation_curve(fit, channel=channel, n_points=n_points).sort_values("spend")
         current_spend = float(panel[spend_col].mean())
+        if pd.isna(current_spend):
+            logger.warning("Current spend is NaN for channel %r; skipping.", channel)
+            continue
         increased_spend = current_spend * spend_multiplier
         current_response = float(
             np.interp(current_spend, curve["spend"], curve["saturation"])
