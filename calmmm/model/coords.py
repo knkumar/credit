@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 import numpy as np
 import pandas as pd
 
 from calmmm.data.containers import MMMData
+
+logger = logging.getLogger(__name__)
 
 
 def build_coords(data: MMMData, n_fourier_pairs: int = 2) -> dict[str, list]:
@@ -50,6 +53,8 @@ def build_controls_array(data: MMMData) -> tuple[np.ndarray | None, list[str]]:
     ni = df["control"].map(n_idx).values
     # Filter out rows with unmapped keys (map returns NaN for missing)
     valid = ~(np.isnan(ti) | np.isnan(gi) | np.isnan(ni))
+    if not valid.all():
+        logger.warning("Extraneous or unmapped rows found in media/controls data that will be dropped.")
     ti = ti[valid].astype(int)
     gi = gi[valid].astype(int)
     ni = ni[valid].astype(int)
@@ -111,6 +116,8 @@ def build_arrays(
     mci = mdf["channel"].map(c_idx).values
     
     valid_m = ~(pd.isna(mti) | pd.isna(mgi) | pd.isna(mci))
+    if not valid_m.all():
+        logger.warning("Extraneous or unmapped rows found in media/controls data that will be dropped.")
     mti_valid = mti[valid_m].astype(int)
     mgi_valid = mgi[valid_m].astype(int)
     mci_valid = mci[valid_m].astype(int)

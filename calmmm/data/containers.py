@@ -196,6 +196,11 @@ class IncrementalityTests:
                     pass
             return cast(value)
 
+        required_cols = [channel, kpi, geo_scope, start, end, lift]
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            raise KeyError(f"Missing required columns in DataFrame: {missing_cols}")
+
         experiments = []
         seen_ids = set()
         for i, row in df.iterrows():
@@ -262,6 +267,11 @@ class IncrementalityTests:
 def _validate_experiment_against_dataset(
     exp: ExperimentRow, dataset: "MMMData"
 ) -> None:
+    if pd.isna(exp.start_date) or pd.isna(exp.end_date):
+        raise ValueError(f"experiment '{exp.test_id}' has missing (NaT) start or end date.")
+    if exp.start_date > exp.end_date:
+        raise ValueError(f"experiment '{exp.test_id}' start_date is after end_date.")
+
     known_channels = set(dataset.channels)
     for ch in exp.channel_bundle:
         if ch not in known_channels:
