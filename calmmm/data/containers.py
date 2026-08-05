@@ -211,7 +211,7 @@ class IncrementalityTests:
 
         experiments = []
         seen_ids = set()
-        for i, row in df.iterrows():
+        for i, (_, row) in enumerate(df.iterrows()):
             def _parse_numeric(col_name):
                 if not col_name:
                     return None
