@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Optional
 import numpy as np
 import pandas as pd
 import pymc as pm
+from scipy.special import expit
 
 from calmmm.data.containers import MMMData
 
@@ -43,7 +44,7 @@ def get_sigma_val(fit: "MMMFit", kpi: str, target_ndim: int) -> float | np.ndarr
             sigma_val = np.expand_dims(sigma_val, axis=-1)
     else:
         sigma_val = 0.0
-    return sigma_val
+    return np.asarray(sigma_val)
 
 
 def _regression_metrics(
@@ -69,7 +70,10 @@ def _regression_metrics(
         centered = y_true - float(np.mean(y_true))
         sst = float(np.sum(centered**2))
         metrics[f"rmse_{kpi}"] = float(np.sqrt(np.mean(residual**2)))
-        metrics[f"r2_{kpi}"] = float(1.0 - sse / sst) if sst > 0 else np.nan
+        if sst == 0.0:
+            metrics[f"r2_{kpi}"] = 1.0 if sse == 0.0 else 0.0
+        else:
+            metrics[f"r2_{kpi}"] = float(1.0 - sse / sst)
     return metrics
 
 
@@ -291,7 +295,6 @@ class MMMFit:
         for k, kpi in enumerate(mmm._data.kpis):
             likelihood = mmm._data.kpi_metadata.loc[mmm._data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
-                from scipy.special import expit
                 pop_k = mmm._pop_array[holdout_mask][..., k]
                 pred_mean[..., k] = expit(mu_holdout[..., k]) * pop_k
             elif likelihood == "lognormal":
@@ -325,7 +328,6 @@ class MMMFit:
         for k, kpi in enumerate(self.data.kpis):
             likelihood = self.data.kpi_metadata.loc[self.data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
-                from scipy.special import expit
                 pop_k = mmm._pop_array[mmm._train_mask][..., k]
                 predicted[..., k] = expit(mu[..., k]) * pop_k
             elif likelihood == "lognormal":

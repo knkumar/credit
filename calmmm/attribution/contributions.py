@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
+from scipy.special import expit
+
 from calmmm.model.fit import eval_mu_and_channel_contrib as _eval_params
 from calmmm.model.fit import get_sigma_val
 
@@ -66,7 +68,6 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
     for k, kpi in enumerate(kpis):
         likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
         if likelihood == "binomial":
-            from scipy.special import expit
             pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
             exp_mu[..., :, k] = expit(mu_val[..., :, k]) * pop_k
             baseline_contrib[..., :, k] = expit(mu_val[..., :, k] - cc_sum[..., :, k]) * pop_k
@@ -159,7 +160,6 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
     for k, kpi in enumerate(kpis):
         likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
         if likelihood == "binomial":
-            from scipy.special import expit
             pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
             exp_mu[..., :, k] = expit(mu_val[..., :, k]) * pop_k
         elif likelihood == "lognormal":
@@ -192,7 +192,6 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
         for k, kpi in enumerate(kpis):
             likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
-                from scipy.special import expit
                 pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
                 contrib_c[..., :, k] = exp_mu[..., :, k] - (expit(mu_val[..., :, k] - cc_c[..., :, k]) * pop_k)
             elif likelihood == "lognormal":

@@ -9,6 +9,8 @@ import pytensor.tensor as pt
 
 logger = logging.getLogger(__name__)
 
+from scipy.special import logit
+
 from calmmm.data.containers import MMMData
 from calmmm.data.validation import validate_mmmdata
 from calmmm.model.coords import build_coords, build_arrays, build_controls_array
@@ -138,7 +140,6 @@ class HierarchicalMMM:
         for k, kpi in enumerate(data.kpis):
             likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
-                from scipy.special import logit
                 p = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k] / np.maximum(pop_array[train_mask, :, k], 1.0), axis=0), nan=0.0)
                 p = np.clip(p, 1e-4, 1.0 - 1e-4)
                 obs_mean_log[k, :] = logit(p)
@@ -266,7 +267,7 @@ class HierarchicalMMM:
             or self._data is not data
             or (experiments is not None and not self._calibration_targets)
             or (experiments is None and bool(self._calibration_targets))
-            or experiments is not getattr(self, "_last_experiments", object())
+            or experiments != getattr(self, "_last_experiments", None)
         ):
             self.build_model(data, experiments=experiments)
 
