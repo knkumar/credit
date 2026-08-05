@@ -141,7 +141,7 @@ def _check_lognormal_kpi_integrity(dataset: MMMData, result: ValidationResult) -
                 dataset.observations["kpi"] == kpi, "outcome"
             ].dropna()
             obs_numeric = pd.to_numeric(obs, errors='coerce')
-            non_pos_mask = obs_numeric <= 0
+            non_pos_mask = (obs_numeric <= 0) | obs_numeric.isna()
             if non_pos_mask.any():
                 result.errors.append(
                     f"KPI '{kpi}' has likelihood='lognormal' but "
