@@ -71,6 +71,24 @@ def _check_duplicate_panel_rows(dataset: MMMData, result: ValidationResult) -> N
             f"Duplicate panel rows detected: {n} duplicate (time, geo, kpi) combinations"
         )
 
+    media = dataset.media
+    if not media.empty:
+        media_dupes = media.duplicated(subset=["time", "geo", "channel"])
+        if media_dupes.any():
+            n = int(media_dupes.sum())
+            result.errors.append(
+                f"Duplicate panel rows detected: {n} duplicate (time, geo, channel) combinations in media data"
+            )
+
+    controls = dataset.controls
+    if not controls.empty:
+        controls_dupes = controls.duplicated(subset=["time", "geo", "control"])
+        if controls_dupes.any():
+            n = int(controls_dupes.sum())
+            result.errors.append(
+                f"Duplicate panel rows detected: {n} duplicate (time, geo, control) combinations in controls data"
+            )
+
 
 def _check_negative_spend(dataset: MMMData, result: ValidationResult) -> None:
     neg = dataset.media["spend"] < 0
