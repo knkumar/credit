@@ -355,10 +355,11 @@ class MMMFit:
 
         import arviz as az
 
-        default_vars = ["adstock_decay", "hill_alpha", "hill_k"]
-        requested = var_names or [
-            name for name in default_vars if name in self.trace.posterior
-        ]
+        if var_names is not None:
+            requested = [name for name in var_names if name in self.trace.posterior.data_vars]
+        else:
+            default_vars = ["adstock_decay", "hill_alpha", "hill_k"]
+            requested = [name for name in default_vars if name in self.trace.posterior.data_vars]
         if not requested:
             return pd.DataFrame(columns=columns)
 
