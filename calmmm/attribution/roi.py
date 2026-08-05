@@ -65,7 +65,7 @@ def compute_roi(fit: "MMMFit") -> pd.DataFrame:
         np.nan,
     )
 
-    zero_spend = merged[merged["total_spend"].fillna(0) < 1e-8]["channel"].unique().tolist()
+    zero_spend = merged[merged["total_spend"] < 1e-8]["channel"].unique().tolist()
     if zero_spend:
         logger.warning("Near-zero training-window spend for channel(s) %s; ROI set to NaN", zero_spend)
 
