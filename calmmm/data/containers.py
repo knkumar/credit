@@ -169,6 +169,11 @@ class IncrementalityTests:
     def __iter__(self):
         return iter(self._experiments)
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, IncrementalityTests):
+            return NotImplemented
+        return self._experiments == other._experiments
+
     @classmethod
     def from_dataframe(
         cls,
@@ -228,6 +233,8 @@ class IncrementalityTests:
             seen_ids.add(test_id)
 
             channel_val = row[channel]
+            if pd.isna(channel_val) or str(channel_val).strip() == "" or str(channel_val).strip().lower() == "nan":
+                raise ValueError("Channel mapping is missing or empty for experiment row.")
             channels = (
                 [c.strip() for c in channel_val.split(",")]
                 if isinstance(channel_val, str)

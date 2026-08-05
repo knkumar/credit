@@ -96,3 +96,23 @@ class ExperimentRow:
         import math
         if self.se <= 0 or math.isnan(self.se) or math.isinf(self.se):
             raise ValueError(f"se must be > 0 and finite, got {self.se}")
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ExperimentRow):
+            return NotImplemented
+        return (
+            self.test_id == other.test_id
+            and self.channel_bundle == other.channel_bundle
+            and self.kpi == other.kpi
+            and self.geo_scope == other.geo_scope
+            and self.start_date == other.start_date
+            and self.end_date == other.end_date
+            and self.lift == other.lift
+            and self.se == other.se
+            and self.ci_lower == other.ci_lower
+            and self.ci_upper == other.ci_upper
+            and self.calibration_likelihood == other.calibration_likelihood
+            and self.student_t_nu == other.student_t_nu
+            and self.estimand == other.estimand
+            and self.ci_level == other.ci_level
+        )
