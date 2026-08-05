@@ -87,6 +87,8 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
                 total_media_chunk[..., :, k] = exp_mu_chunk[..., :, k] - baseline_contrib_chunk[..., :, k]
             elif likelihood == "lognormal":
                 sigma_val = get_sigma_val(fit, kpi, mu_chunk.ndim)
+                if is_mcmc:
+                    sigma_val = sigma_val[start_idx:end_idx]
                 exp_mu_chunk[..., :, k] = np.exp(mu_chunk[..., :, k] + sigma_val**2 / 2.0)
                 baseline_contrib_chunk[..., :, k] = np.exp(mu_chunk[..., :, k] - cc_sum_chunk[..., :, k] + sigma_val**2 / 2.0)
                 total_media_chunk[..., :, k] = baseline_contrib_chunk[..., :, k] * np.expm1(cc_sum_chunk[..., :, k])
@@ -190,6 +192,8 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
                 exp_mu_chunk[..., :, k] = expit(mu_chunk[..., :, k]) * pop_k
             elif likelihood == "lognormal":
                 sigma_val = get_sigma_val(fit, kpi, mu_chunk.ndim)
+                if is_mcmc:
+                    sigma_val = sigma_val[start_idx:end_idx]
                 exp_mu_chunk[..., :, k] = np.exp(mu_chunk[..., :, k] + sigma_val**2 / 2.0)
             else:
                 exp_mu_chunk[..., :, k] = np.exp(mu_chunk[..., :, k])
@@ -205,6 +209,8 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
                     val_chunk[..., k] = exp_mu_chunk[..., :, k] - (expit(mu_chunk[..., :, k] - cc_c_chunk[..., :, k]) * pop_k)
                 elif likelihood == "lognormal":
                     sigma_val = get_sigma_val(fit, kpi, mu_chunk.ndim)
+                    if is_mcmc:
+                        sigma_val = sigma_val[start_idx:end_idx]
                     val_chunk[..., k] = exp_mu_chunk[..., :, k] - np.exp(mu_chunk[..., :, k] - cc_c_chunk[..., :, k] + sigma_val**2 / 2.0)
                 else:
                     val_chunk[..., k] = exp_mu_chunk[..., :, k] - np.exp(mu_chunk[..., :, k] - cc_c_chunk[..., :, k])
