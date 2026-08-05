@@ -148,7 +148,7 @@ def build_interaction_step(
                     contrib = contrib * pt.exp(gamma[None, None, :] * signal)
 
             slices[name] = contrib
-            chain_scales[name] = pt.mean(pt.abs(contrib)) + 1e-8
+            chain_scales[name] = pt.mean(pt.abs(contrib), axis=(0, 1), keepdims=True) + 1e-8
 
         return pt.stack([slices[name] for name in channels], axis=-1)  # [T, G, K, C]
 
