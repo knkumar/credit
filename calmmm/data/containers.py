@@ -277,6 +277,14 @@ def _validate_experiment_against_dataset(
             f"known kpis: {sorted(known_kpis)}"
         )
 
+    known_geos = set(dataset.geos)
+    for g in exp.geo_scope:
+        if g not in known_geos:
+            raise ValueError(
+                f"unknown geo '{g}' in experiment '{exp.test_id}'; "
+                f"known geos: {sorted(known_geos)}"
+            )
+
     panel_start = dataset.start_date
     panel_end = dataset.end_date
     if exp.start_date < panel_start or exp.end_date > panel_end:
