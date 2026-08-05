@@ -231,10 +231,7 @@ def test_rebuild_guard_fit_calls_build_model_when_switching_to_uncalibrated(mmmd
     with mock.patch("calmmm.model.mmm.pm.find_MAP", return_value={}):
         with mock.patch("calmmm.model.fit.MMMFit") as mock_fit_cls:
             mock_fit_cls.return_value = mock.MagicMock()
-            try:
-                mmm.fit(mmmdata, experiments=None, mode="map")
-            except Exception:
-                pass  # MMMFit mock may not construct cleanly; we only care about build_calls
+            mmm.fit(mmmdata, experiments=None, mode="map")
 
     # Verify build_model was called through fit()
     assert len(build_calls) >= 1, "build_model should have been called when calibration_targets was non-empty"
