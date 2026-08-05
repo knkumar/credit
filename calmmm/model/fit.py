@@ -251,7 +251,9 @@ class MMMFit:
                 latent_params = latent_init.copy()
                 latent_params.update({k: v for k, v in self.map_params.items() if k in latent_params})
                 with full_model:
-                    fn = full_model.compile_fn(full_model["mu"])
+                    if not hasattr(self, "_compiled_mu_fn"):
+                        self._compiled_mu_fn = full_model.compile_fn(full_model["mu"])
+                    fn = self._compiled_mu_fn
                     mu_val = fn(latent_params)
                 mu_holdout = np.array(mu_val)[holdout_mask]
     
