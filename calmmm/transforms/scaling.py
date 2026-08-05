@@ -20,7 +20,8 @@ class MediaScaler:
 
     def fit_transform(self, spend: np.ndarray) -> np.ndarray:
         spend = np.asarray(spend, dtype=float)
-        self._max = np.asarray(spend.max(axis=tuple(range(spend.ndim - 1))))
+        axis = tuple(range(spend.ndim - 1)) if spend.ndim > 1 else None
+        self._max = np.asarray(spend.max(axis=axis))
         safe_max = np.where(self._max == 0.0, 1.0, self._max)
         return spend / safe_max
 
