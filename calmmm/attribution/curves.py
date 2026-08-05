@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from calmmm.model.fit import MMMFit
 
 
-def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50) -> pd.DataFrame:
+def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50, grid_multiplier: float = 2.0) -> pd.DataFrame:
     """
     Evaluate the Hill saturation curve for one channel.
 
@@ -25,7 +25,7 @@ def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50) -> pd.Data
     Returns
     -------
     DataFrame with columns: spend, saturation, channel
-        spend is in original (unscaled) spend units, grid from 0 to 2×panel_max
+        spend is in original (unscaled) spend units, grid from 0 to grid_multiplier×panel_max
         saturation is Hill(spend/panel_max, alpha, k), values in [0, 1]
     """
     channels = fit.data.channels
@@ -40,7 +40,7 @@ def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50) -> pd.Data
     media_max = fit._mmm._media_max  # [C]
     max_spend = float(media_max[c_idx])
 
-    x = np.linspace(0.0, 2.0 * max_spend, n_points)
+    x = np.linspace(0.0, grid_multiplier * max_spend, n_points)
     x_scaled = x / max(max_spend, 1e-8)
     
     if np.ndim(alpha_c) > 0:
@@ -76,7 +76,8 @@ def spend_response_report(
         if spend_col is None or spend_col not in panel.columns:
             raise ValueError(f"Mapped spend column {spend_col!r} for channel {channel!r} not found in dataset.")
 
-        curve = saturation_curve(fit, channel=channel, n_points=n_points).sort_values("spend")
+        grid_mult = max(2.0, spend_multiplier)
+        curve = saturation_curve(fit, channel=channel, n_points=n_points, grid_multiplier=grid_mult).sort_values("spend")
         current_spend = float(panel[spend_col].mean())
         if pd.isna(current_spend):
             logger.warning("Current spend is NaN for channel %r; skipping.", channel)

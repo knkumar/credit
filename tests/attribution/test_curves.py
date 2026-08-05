@@ -14,7 +14,7 @@ class _FakeFit:
 
 
 def test_spend_response_report_uses_saturation_curves(monkeypatch):
-    def fake_saturation_curve(_fit, channel, n_points=100):
+    def fake_saturation_curve(_fit, channel, n_points=100, grid_multiplier=2.0):
         curves = {
             "search": pd.DataFrame(
                 {
