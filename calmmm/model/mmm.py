@@ -107,7 +107,7 @@ class HierarchicalMMM:
         if len(data.times) >= 2:
             import pandas as pd
             diffs = pd.Series(data.times).diff().dropna()
-            median_days = diffs.dt.days.median()
+            median_days = diffs.dt.total_seconds().median() / 86400.0
             period = 365.25 / max(median_days, 1.0)
             
             standard_periods = [1.0, 4.0, 12.0, 52.17, 365.25]
