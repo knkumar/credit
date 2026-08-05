@@ -39,7 +39,17 @@ def validate_mmmdata(dataset: MMMData) -> ValidationResult:
     _check_binomial_kpi_has_population(dataset, result)
     _check_binomial_not_exceeds_population(dataset, result)
     _check_weak_media_variation(dataset, result)
+    _check_temporal_continuity(dataset, result)
     return result
+
+
+def _check_temporal_continuity(dataset: MMMData, result: ValidationResult) -> None:
+    diffs = pd.Series(dataset.times).diff().dropna()
+    if not diffs.empty:
+        if not (diffs == diffs.iloc[0]).all():
+            result.errors.append(
+                "Dataset has missing dates or irregular gaps, which breaks sequential adstock and seasonality assumptions."
+            )
 
 
 def _check_unknown_likelihoods(dataset: MMMData, result: ValidationResult) -> None:
