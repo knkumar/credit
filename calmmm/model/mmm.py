@@ -70,6 +70,8 @@ class HierarchicalMMM:
 
         The model uses a log-link for all KPIs:
             log(E[y]) = baseline[t,g,k] + media_contrib[t,g,k]
+            (For LogNormal likelihood, mu = baseline + media_contrib models the log-median,
+             and the true log-mean includes the variance term: mu + sigma^2 / 2)
 
         Media pipeline:
             raw_spend → scale (÷ panel max) → geometric adstock → Hill saturation
@@ -108,22 +110,22 @@ class HierarchicalMMM:
         media_scaled = media_array / np.maximum(media_max, 1e-8)
 
         # Determine period from data times
-        if len(data.times) >= 2:
-            import pandas as pd
-            diffs = pd.Series(data.times).diff().dropna()
-            median_days = diffs.dt.total_seconds().median() / 86400.0
-            period = 365.25 / max(median_days, 1.0)
-            if 11.5 < period < 12.5:
-                period = 12.0
-            
-            standard_periods = [1.0, 4.0, 12.0, 52.17, 365.25]
-            if not any(abs(period - sp) < 0.15 * sp for sp in standard_periods):
-                logger.warning(
-                    "Inferred seasonality period (%.2f) deviates significantly from standard cyclic patterns (e.g. 12, 52, 365).",
-                    period
-                )
-        else:
-            period = 52.0  # fallback
+        if len(data.times) < 2:
+            raise ValueError("Insufficient data: at least 2 time steps are required.")
+
+        import pandas as pd
+        diffs = pd.Series(data.times).diff().dropna()
+        median_days = diffs.dt.total_seconds().median() / 86400.0
+        period = 365.25 / max(median_days, 1.0)
+        if 11.5 < period < 12.5:
+            period = 12.0
+        
+        standard_periods = [1.0, 4.0, 12.0, 52.17, 365.25]
+        if not any(abs(period - sp) < 0.15 * sp for sp in standard_periods):
+            logger.warning(
+                "Inferred seasonality period (%.2f) deviates significantly from standard cyclic patterns (e.g. 12, 52, 365).",
+                period
+            )
 
         # Fourier features: t = 0-based index
         fourier_matrix = fourier_features(
@@ -262,14 +264,18 @@ class HierarchicalMMM:
         """
         from calmmm.model.fit import MMMFit
 
-        logger.info("fit: mode=%s", mode)
+        has_experiments = experiments is not None and len(experiments) > 0
+        has_targets = bool(self._calibration_targets)
+        curr_exps = experiments if experiments is not None else []
+        last_exps = getattr(self, "_last_experiments", None)
+        last_exps = last_exps if last_exps is not None else []
 
         if (
             self._model is None
             or self._data is not data
-            or (experiments is not None and not self._calibration_targets)
-            or (experiments is None and bool(self._calibration_targets))
-            or experiments != getattr(self, "_last_experiments", None)
+            or (has_experiments and not has_targets)
+            or (not has_experiments and has_targets)
+            or curr_exps != last_exps
         ):
             self.build_model(data, experiments=experiments)
 

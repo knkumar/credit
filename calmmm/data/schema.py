@@ -92,5 +92,7 @@ class ExperimentRow:
             from scipy.stats import norm
             z = norm.ppf((1 + self.ci_level) / 2)
             self.se = (self.ci_upper - self.ci_lower) / (2 * z)
-        if self.se <= 0:
-            raise ValueError(f"se must be > 0, got {self.se}")
+        
+        import math
+        if self.se <= 0 or math.isnan(self.se) or math.isinf(self.se):
+            raise ValueError(f"se must be > 0 and finite, got {self.se}")

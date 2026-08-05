@@ -88,6 +88,9 @@ class MMMData:
         df[time] = pd.to_datetime(df[time])
         if df[time].isna().any():
             raise ValueError(f"Missing or unparseable dates found in column '{time}'")
+        
+        if df.duplicated(subset=[time, geo]).any():
+            raise ValueError("Duplicate (time, geo) combinations found in observations data.")
 
         # Build observations: long format (one row per time x geo x kpi)
         # column order: time, geo, kpi, outcome, population

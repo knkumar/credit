@@ -17,10 +17,8 @@ def _make_dataset(df, **kwargs):
 
 def test_duplicate_panel_rows_error(synthetic_panel):
     duped = pd.concat([synthetic_panel, synthetic_panel.head(1)], ignore_index=True)
-    dataset = _make_dataset(duped)
-    result = validate_mmmdata(dataset)
-    assert result.has_errors
-    assert any("duplicate" in e.lower() for e in result.errors)
+    with pytest.raises(ValueError, match="Duplicate"):
+        dataset = _make_dataset(duped)
 
 
 def test_negative_spend_error(synthetic_panel):
