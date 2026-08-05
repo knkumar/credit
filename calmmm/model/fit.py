@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -99,7 +100,7 @@ class MMMFit:
     _mmm: Optional["HierarchicalMMM"] = field(default=None, repr=False)
     calibration_targets: list = field(default_factory=list)
 
-    def to_netcdf(self, path) -> None:
+    def to_netcdf(self, path: Union[str, Path]) -> None:
         """
         Serialize the fit to a netCDF file.
 
@@ -147,7 +148,13 @@ class MMMFit:
             )
 
     @classmethod
-    def from_netcdf(cls, path, data, mmm, experiments: Optional["IncrementalityTests"] = None) -> "MMMFit":
+    def from_netcdf(
+        cls, 
+        path: Union[str, Path], 
+        data: "MMMData", 
+        mmm: "HierarchicalMMM", 
+        experiments: Optional["IncrementalityTests"] = None
+    ) -> "MMMFit":
         """
         Reconstruct an ``MMMFit`` from a netCDF file written by ``to_netcdf``.
 
