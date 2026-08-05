@@ -99,6 +99,8 @@ class HierarchicalMMM:
         # Scale media per-channel by panel max (from train set)
         media_max = media_array[train_mask].max(axis=(0, 1), keepdims=True)  # [1, 1, C]
         global_max = media_array.max(axis=(0, 1), keepdims=True)
+        if (global_max == 0.0).all():
+            logger.warning("The dataset has absolutely zero media spend across all channels, indicating a likely data issue.")
         media_max = np.where(media_max == 0.0, global_max, media_max)
         self._media_max = media_max[0, 0, :]  # [C] — per-channel panel max spend
         media_scaled = media_array / np.maximum(media_max, 1e-8)
