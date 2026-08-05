@@ -47,7 +47,9 @@ def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50, grid_multi
         alpha_c = alpha_c[..., np.newaxis]
         k_c = k_c[..., np.newaxis]
 
-    saturation = 1 / (1 + (k_c / np.clip(x_scaled, 1e-9, None)) ** alpha_c)
+    x_pow = np.clip(x_scaled, 1e-9, None) ** alpha_c
+    k_pow = k_c ** alpha_c
+    saturation = x_pow / (x_pow + k_pow)
 
     if np.ndim(saturation) > 1:
         saturation = saturation.mean(axis=tuple(range(np.ndim(saturation) - 1)))
