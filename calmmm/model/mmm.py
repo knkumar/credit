@@ -172,7 +172,7 @@ class HierarchicalMMM:
             # Wrap inputs in Data to avoid recompilation
             X_media_train_data = pm.Data("X_media", X_media_train, dims=("time", "geo", "channel"))
             fourier_train_data = pm.Data("fourier_features", fourier_train, dims=("time", "fourier"))
-            obs_train_data = pm.Data("obs_array", np.ma.masked_invalid(obs_train), dims=("time", "geo", "kpi"))
+            obs_train_data = np.ma.masked_invalid(obs_train)
             pop_train_data = pm.Data("pop_array", np.nan_to_num(pop_train, nan=1.0), dims=("time", "geo", "kpi"))
             
             ctrl_train_data = None

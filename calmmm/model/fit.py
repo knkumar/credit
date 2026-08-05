@@ -241,7 +241,6 @@ class MMMFit:
             new_data = {
                 "X_media": mmm._media_scaled,
                 "fourier_features": mmm._fourier_matrix,
-                "obs_array": np.ma.masked_invalid(mmm._obs_array),
                 "pop_array": np.nan_to_num(mmm._pop_array, nan=1.0),
             }
             if getattr(mmm, "_ctrl_array", None) is not None:
@@ -283,7 +282,6 @@ class MMMFit:
                 new_data_train = {
                     "X_media": mmm._media_scaled[mmm._train_mask],
                     "fourier_features": mmm._fourier_matrix[mmm._train_mask],
-                    "obs_array": np.ma.masked_invalid(mmm._obs_array[mmm._train_mask]),
                     "pop_array": np.nan_to_num(mmm._pop_array[mmm._train_mask], nan=1.0),
                 }
                 if getattr(mmm, "_ctrl_array", None) is not None:
