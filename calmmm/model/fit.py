@@ -244,6 +244,10 @@ class MMMFit:
             holdout_fraction=0.0,
             interaction_graph=mmm.interaction_graph,
         )
+        eval_mmm._media_max = mmm._media_max
+        if getattr(mmm, "_ctrl_mean", None) is not None:
+            eval_mmm._ctrl_mean = mmm._ctrl_mean
+            eval_mmm._ctrl_std = mmm._ctrl_std
         full_model = eval_mmm.build_model(mmm._data, experiments=mmm._last_experiments)
 
         if self.map_params is not None:

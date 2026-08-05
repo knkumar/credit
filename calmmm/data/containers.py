@@ -92,6 +92,9 @@ class MMMData:
         if df.duplicated(subset=[time, geo]).any():
             raise ValueError("Duplicate (time, geo) combinations found in observations data.")
 
+        if population is not None and df[population].isna().any():
+            raise ValueError(f"Population column '{population}' contains missing values. Please ensure all rows have a valid population size.")
+
         # Build observations: long format (one row per time x geo x kpi)
         # column order: time, geo, kpi, outcome, population
         obs_rows = []

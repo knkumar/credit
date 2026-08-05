@@ -90,10 +90,10 @@ def spend_response_report(
         current_spend = float(spend_arr.mean())
         increased_spend = current_spend * spend_multiplier
         
-        current_responses = np.interp(spend_arr, curve["spend"], curve["saturation"])
+        current_responses = np.interp(spend_arr, curve["spend"].to_numpy(), curve["saturation"].to_numpy())
         current_response = float(current_responses.mean())
         
-        increased_responses = np.interp(spend_arr * spend_multiplier, curve["spend"], curve["saturation"])
+        increased_responses = np.interp(spend_arr * spend_multiplier, curve["spend"].to_numpy(), curve["saturation"].to_numpy())
         increased_response = float(increased_responses.mean())
         saturation_lift = increased_response - current_response
         if current_response != 0.0:

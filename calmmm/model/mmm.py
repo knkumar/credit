@@ -105,13 +105,14 @@ class HierarchicalMMM:
         self._train_mask = train_mask
 
         # Scale media per-channel by panel max (from train set)
-        media_max = media_array[train_mask].max(axis=(0, 1), keepdims=True)  # [1, 1, C]
-        global_max = media_array.max(axis=(0, 1), keepdims=True)
-        if (global_max == 0.0).any():
-            logger.warning("The dataset has zero media spend for one or more channels, indicating a likely data issue.")
-        media_max = np.where(media_max == 0.0, global_max, media_max)
-        self._media_max = media_max[0, 0, :]  # [C] — per-channel panel max spend
-        media_scaled = media_array / np.maximum(media_max, 1e-8)
+        if getattr(self, "_media_max", None) is None:
+            media_max = media_array[train_mask].max(axis=(0, 1), keepdims=True)  # [1, 1, C]
+            global_max = media_array.max(axis=(0, 1), keepdims=True)
+            if (global_max == 0.0).any():
+                logger.warning("The dataset has zero media spend for one or more channels, indicating a likely data issue.")
+            media_max = np.where(media_max == 0.0, global_max, media_max)
+            self._media_max = media_max[0, 0, :]  # [C] — per-channel panel max spend
+        media_scaled = media_array / np.maximum(self._media_max, 1e-8)
 
         # Determine period from data times
         if len(data.times) < 2:
@@ -166,9 +167,11 @@ class HierarchicalMMM:
         self._fourier_matrix = fourier_matrix
         self._pop_array = pop_array
         if ctrl_array is not None:
-            ctrl_train_raw = ctrl_array[train_mask]
-            ctrl_std = np.where(ctrl_train_raw.std(axis=0) == 0, 1.0, ctrl_train_raw.std(axis=0))
-            self._ctrl_array = (ctrl_array - ctrl_train_raw.mean(axis=0)) / ctrl_std
+            if getattr(self, "_ctrl_mean", None) is None:
+                ctrl_train_raw = ctrl_array[train_mask]
+                self._ctrl_std = np.where(ctrl_train_raw.std(axis=0) == 0, 1.0, ctrl_train_raw.std(axis=0))
+                self._ctrl_mean = ctrl_train_raw.mean(axis=0)
+            self._ctrl_array = (ctrl_array - self._ctrl_mean) / self._ctrl_std
         else:
             self._ctrl_array = None
 
