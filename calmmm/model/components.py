@@ -171,6 +171,8 @@ def _add_likelihood(
         row = kpi_metadata.loc[kpi_metadata["kpi"] == kpi]
         likelihood = row["likelihood"].values[0]
         y_obs = obs_array[:, :, k]
+        if isinstance(y_obs, np.ndarray):
+            y_obs = np.ma.masked_invalid(y_obs)
         mu_k = mu[:, :, k]
 
         if likelihood == "gaussian":
