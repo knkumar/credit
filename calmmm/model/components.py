@@ -145,6 +145,14 @@ def _build_media_hierarchy(
     return channel_contrib_tgkc.sum(axis=-1)  # [T, G, K]
 
 
+def _prepare_discrete_observed(y_obs: np.ndarray | pt.TensorVariable) -> np.ndarray | pt.TensorVariable:
+    if isinstance(y_obs, pt.TensorVariable):
+        return pt.cast(y_obs, "int64")
+    return np.ma.array(
+        np.nan_to_num(y_obs, nan=0).astype("int64"), mask=np.ma.getmask(y_obs)
+    )
+
+
 def _add_likelihood(
     mu: pt.TensorVariable,
     obs_array: np.ndarray | pt.TensorVariable,
@@ -186,12 +194,7 @@ def _add_likelihood(
 
         elif likelihood == "negative_binomial":
             alpha_k = pm.HalfNormal(f"nb_alpha_{kpi}", sigma=priors.nb_alpha_sigma)
-            if isinstance(y_obs, pt.TensorVariable):
-                y_obs_discrete = pt.cast(y_obs, "int64")
-            else:
-                y_obs_discrete = np.ma.array(
-                    np.nan_to_num(y_obs, nan=0).astype("int64"), mask=np.ma.getmask(y_obs)
-                )
+            y_obs_discrete = _prepare_discrete_observed(y_obs)
             pm.NegativeBinomial(
                 f"obs_{kpi}",
                 mu=pm.math.exp(mu_k),
@@ -201,12 +204,7 @@ def _add_likelihood(
 
         elif likelihood == "binomial":
             n_pop = pop_array[:, :, k]
-            if isinstance(y_obs, pt.TensorVariable):
-                y_obs_discrete = pt.cast(y_obs, "int64")
-            else:
-                y_obs_discrete = np.ma.array(
-                    np.nan_to_num(y_obs, nan=0).astype("int64"), mask=np.ma.getmask(y_obs)
-                )
+            y_obs_discrete = _prepare_discrete_observed(y_obs)
             pm.Binomial(
                 f"obs_{kpi}",
                 n=pt.cast(n_pop, "int64"),
