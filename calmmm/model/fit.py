@@ -70,7 +70,7 @@ def _regression_metrics(
         centered = y_true - float(np.mean(y_true))
         sst = float(np.sum(centered**2))
         metrics[f"rmse_{kpi}"] = float(np.sqrt(np.mean(residual**2)))
-        if sst == 0.0:
+        if sst < 1e-8:
             metrics[f"r2_{kpi}"] = 1.0 if sse == 0.0 else 0.0
         else:
             metrics[f"r2_{kpi}"] = float(1.0 - sse / sst)
