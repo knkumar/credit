@@ -205,10 +205,15 @@ class IncrementalityTests:
         seen_ids = set()
         for i, row in df.iterrows():
             def _parse_numeric(col_name):
-                if col_name and col_name in df.columns:
+                if not col_name:
+                    return None
+                if col_name in df.columns:
                     val = pd.to_numeric(row[col_name], errors="coerce")
                     return None if pd.isna(val) else float(val)
-                return None
+                try:
+                    return float(col_name)
+                except (ValueError, TypeError):
+                    return None
 
             se = _parse_numeric(standard_error)
             ci_lo = _parse_numeric(ci_lower)
