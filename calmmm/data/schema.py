@@ -80,6 +80,10 @@ class ExperimentRow:
     ci_level: float = 0.95  # confidence level for the reported CI; 0.95 → z≈1.96
 
     def __post_init__(self) -> None:
+        import math
+        if math.isnan(self.lift) or math.isinf(self.lift):
+            raise ValueError("lift must be a finite number")
+
         if self.se is None:
             if self.ci_lower is None or self.ci_upper is None:
                 raise ValueError(
@@ -93,7 +97,6 @@ class ExperimentRow:
             z = norm.ppf((1 + self.ci_level) / 2)
             self.se = (self.ci_upper - self.ci_lower) / (2 * z)
         
-        import math
         if self.se <= 0 or math.isnan(self.se) or math.isinf(self.se):
             raise ValueError(f"se must be > 0 and finite, got {self.se}")
 
