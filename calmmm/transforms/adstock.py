@@ -50,6 +50,12 @@ def weibull_adstock(
     counterpart; one would need to be written before using Weibull adstock
     in the PyMC model.
     """
+    import warnings
+    warnings.warn(
+        "weibull_adstock lacks a PyTensor counterpart and is currently considered an experimental/reference feature.",
+        UserWarning,
+        stacklevel=2,
+    )
     if shape <= 0:
         raise ValueError(f"shape must be > 0, got {shape}")
     if scale <= 0:

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, Literal
 
 import pytensor.tensor as pt
+import pymc as pm
 
 
 @dataclass
@@ -116,8 +117,6 @@ def build_interaction_step(
     gamma's prior scale stays comparable regardless of where in the graph
     an edge sits.
     """
-    import pymc as pm
-
     graph.validate_channels(channels)
     channel_idx = {name: i for i, name in enumerate(channels)}
     order = graph.topological_order()

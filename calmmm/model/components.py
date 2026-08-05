@@ -149,7 +149,7 @@ def _prepare_discrete_observed(y_obs: np.ndarray | pt.TensorVariable) -> np.ndar
     if isinstance(y_obs, pt.TensorVariable):
         return pt.cast(y_obs, "int64")
     return np.ma.array(
-        np.nan_to_num(y_obs, nan=-1).astype("int64"), mask=np.ma.getmask(y_obs)
+        np.nan_to_num(y_obs, nan=-1).astype("int64"), mask=np.ma.getmask(y_obs)  # purely a defensive safety net
     )
 
 
