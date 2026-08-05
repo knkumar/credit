@@ -29,9 +29,11 @@ class ValidationResult:
 
 def validate_mmmdata(dataset: MMMData) -> ValidationResult:
     result = ValidationResult()
+    _check_kpi_metadata_completeness(dataset, result)
     _check_unknown_likelihoods(dataset, result)
     _check_duplicate_panel_rows(dataset, result)
     _check_negative_spend(dataset, result)
+    _check_all_zero_spend(dataset, result)
     _check_missing_outcomes(dataset, result)
     _check_missing_features(dataset, result)
     _check_count_kpi_integrity(dataset, result)
@@ -41,6 +43,21 @@ def validate_mmmdata(dataset: MMMData) -> ValidationResult:
     _check_weak_media_variation(dataset, result)
     _check_temporal_continuity(dataset, result)
     return result
+
+
+def _check_kpi_metadata_completeness(dataset: MMMData, result: ValidationResult) -> None:
+    metadata_kpis = set(dataset.kpi_metadata["kpi"])
+    missing_kpis = [kpi for kpi in dataset.kpis if kpi not in metadata_kpis]
+    if missing_kpis:
+        result.errors.append(f"KPIs present in observations but missing from metadata: {missing_kpis}")
+
+
+def _check_all_zero_spend(dataset: MMMData, result: ValidationResult) -> None:
+    if not dataset.media.empty and "spend" in dataset.media.columns:
+        spend_sums = dataset.media.groupby("channel")["spend"].sum()
+        zero_channels = spend_sums[spend_sums == 0.0].index.tolist()
+        if zero_channels:
+            result.errors.append(f"The following channels have all-zero spend across the panel: {zero_channels}. They provide no signal.")
 
 
 def _check_temporal_continuity(dataset: MMMData, result: ValidationResult) -> None:
@@ -100,8 +117,7 @@ def _check_negative_spend(dataset: MMMData, result: ValidationResult) -> None:
 
 
 def _check_missing_outcomes(dataset: MMMData, result: ValidationResult) -> None:
-    for _, row in dataset.kpi_metadata.iterrows():
-        kpi = row["kpi"]
+    for kpi in dataset.kpis:
         kpi_obs = dataset.observations[dataset.observations["kpi"] == kpi]
         missing = int(kpi_obs["outcome"].isna().sum())
         if missing > 0:
