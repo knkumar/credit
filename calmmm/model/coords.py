@@ -54,7 +54,7 @@ def build_controls_array(data: MMMData) -> tuple[np.ndarray | None, list[str]]:
     # Filter out rows with unmapped keys (map returns NaN for missing)
     valid = ~(np.isnan(ti) | np.isnan(gi) | np.isnan(ni))
     if not valid.all():
-        logger.warning("Extraneous or unmapped rows found in media/controls data that will be dropped.")
+        raise ValueError("Extraneous or unmapped rows found in controls data. Please fix your unmapped string keys.")
     ti = ti[valid].astype(int)
     gi = gi[valid].astype(int)
     ni = ni[valid].astype(int)
@@ -100,6 +100,8 @@ def build_arrays(
     
     # Filter valid rows and cast to int
     valid = ~(pd.isna(ti) | pd.isna(gi) | pd.isna(ki))
+    if not valid.all():
+        raise ValueError("Extraneous or unmapped rows found in observations data. Please fix your unmapped string keys.")
     ti_valid = ti[valid].astype(int)
     gi_valid = gi[valid].astype(int)
     ki_valid = ki[valid].astype(int)
@@ -117,7 +119,7 @@ def build_arrays(
     
     valid_m = ~(pd.isna(mti) | pd.isna(mgi) | pd.isna(mci))
     if not valid_m.all():
-        logger.warning("Extraneous or unmapped rows found in media/controls data that will be dropped.")
+        raise ValueError("Extraneous or unmapped rows found in media data. Please fix your unmapped string keys.")
     mti_valid = mti[valid_m].astype(int)
     mgi_valid = mgi[valid_m].astype(int)
     mci_valid = mci[valid_m].astype(int)

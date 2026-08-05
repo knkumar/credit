@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from calmmm.data.containers import IncrementalityTests
+    from calmmm.model.fit import MMMFit
 
 import numpy as np
 import pymc as pm
@@ -161,7 +165,11 @@ class HierarchicalMMM:
         self._media_scaled = media_scaled
         self._fourier_matrix = fourier_matrix
         self._pop_array = pop_array
-        self._ctrl_array = ctrl_array
+        if ctrl_array is not None:
+            ctrl_std = np.where(ctrl_array.std(axis=0) == 0, 1.0, ctrl_array.std(axis=0))
+            self._ctrl_array = (ctrl_array - ctrl_array.mean(axis=0)) / ctrl_std
+        else:
+            self._ctrl_array = None
 
         # Train slices
         X_media_train = media_scaled[train_mask]       # [T_train, G, C]
