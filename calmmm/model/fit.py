@@ -241,8 +241,8 @@ class MMMFit:
             new_data = {
                 "X_media": mmm._media_scaled,
                 "fourier_features": mmm._fourier_matrix,
-                "obs_array": mmm._obs_array,
-                "pop_array": mmm._pop_array,
+                "obs_array": np.ma.masked_invalid(mmm._obs_array),
+                "pop_array": np.nan_to_num(mmm._pop_array, nan=1.0),
             }
             if getattr(mmm, "_ctrl_array", None) is not None:
                 new_data["ctrl_array"] = mmm._ctrl_array
