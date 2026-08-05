@@ -53,7 +53,7 @@ def build_controls_array(data: MMMData) -> tuple[np.ndarray | None, list[str]]:
     ti = ti[valid].astype(int)
     gi = gi[valid].astype(int)
     ni = ni[valid].astype(int)
-    if len(set(zip(ti, gi, ni))) != len(ti):
+    if len(np.unique(np.column_stack((ti, gi, ni)), axis=0)) != len(ti):
         raise ValueError("data.controls contains duplicate (time, geo, control) rows")
     ctrl_array[ti, gi, ni] = df["value"].values[valid]
 
@@ -99,7 +99,7 @@ def build_arrays(
     gi_valid = gi[valid].astype(int)
     ki_valid = ki[valid].astype(int)
     
-    if len(set(zip(ti_valid, gi_valid, ki_valid))) != len(ti_valid):
+    if len(np.unique(np.column_stack((ti_valid, gi_valid, ki_valid)), axis=0)) != len(ti_valid):
         raise ValueError("data.observations contains duplicate (time, geo, kpi) rows")
     obs_array[ti_valid, gi_valid, ki_valid] = df["outcome"].values[valid]
 
@@ -115,7 +115,7 @@ def build_arrays(
     mgi_valid = mgi[valid_m].astype(int)
     mci_valid = mci[valid_m].astype(int)
 
-    if len(set(zip(mti_valid, mgi_valid, mci_valid))) != len(mti_valid):
+    if len(np.unique(np.column_stack((mti_valid, mgi_valid, mci_valid)), axis=0)) != len(mti_valid):
         raise ValueError("data.media contains duplicate (time, geo, channel) rows")
     media_array[mti_valid, mgi_valid, mci_valid] = mdf["spend"].values[valid_m]
 
