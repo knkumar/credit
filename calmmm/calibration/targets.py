@@ -114,6 +114,23 @@ def build_calibration_targets(
         c_indices = np.array([c_idx[c] for c in exp.channel_bundle], dtype=int)
         k_index = k_idx[exp.kpi]
 
+        likelihood_type = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == exp.kpi, "likelihood"].values[0]
+        if likelihood_type == "binomial":
+            df = data.observations
+            mask_t = df["time"].between(exp.start_date, exp.end_date)
+            if exp.geo_scope:
+                mask_g = df["geo"].isin(exp.geo_scope)
+            else:
+                mask_g = pd.Series(True, index=df.index)
+            mask_k = df["kpi"] == exp.kpi
+            sliced_df = df[mask_t & mask_g & mask_k]
+            if "population" not in sliced_df.columns or sliced_df["population"].isna().any():
+                raise ValueError(
+                    f"Experiment '{exp.test_id}' references a binomial KPI ('{exp.kpi}') but the population data "
+                    f"contains missing/NaN values in the experiment window. Cannot calibrate against binomial targets "
+                    f"with missing population data."
+                )
+
         targets.append(
             CalibrationTarget(
                 test_id=exp.test_id,
