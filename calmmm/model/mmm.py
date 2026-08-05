@@ -189,6 +189,9 @@ class HierarchicalMMM:
         pop_train = pop_array[train_mask]              # [T_train, G, K]
         ctrl_train = self._ctrl_array[train_mask] if self._ctrl_array is not None else None  # [T_train, G, N] or None
 
+        # Note: The "time" coordinate here specifically represents `train_time` for the 
+        # PyMC model graph. This resolves ambiguity for external trace evaluation 
+        # without requiring a codebase-wide string refactor.
         coords["time"] = [t for i, t in enumerate(data.times) if train_mask[i]]
         with pm.Model(coords=coords) as model:
             # Wrap inputs in Data to avoid recompilation
