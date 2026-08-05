@@ -49,8 +49,9 @@ def test_binomial_kpi_without_population_errors(synthetic_panel):
         media=["search"], spend=["search_spend"],
         kpi_likelihoods={"visits": "binomial"},
     )
-    result = validate_mmmdata(dataset)
-    assert any("binomial" in e.lower() for e in result.errors)
+    import pytest
+    with pytest.raises(ValueError, match="binomial likelihood but missing population"):
+        validate_mmmdata(dataset)
 
 
 def test_weak_media_variation_warns(synthetic_panel):
