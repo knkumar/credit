@@ -85,6 +85,7 @@ def channel_contributions(fit: "MMMFit", chunk_size: int = 100) -> pd.DataFrame:
         exp_mu_chunk = np.zeros_like(mu_chunk)
         baseline_contrib_chunk = np.zeros_like(mu_chunk)
         total_media_chunk = np.zeros_like(mu_chunk)
+        media_ratio_chunk = np.zeros_like(total_media_chunk)
         
         for k, kpi in enumerate(kpis):
             likelihood = likelihoods[kpi]
@@ -93,18 +94,25 @@ def channel_contributions(fit: "MMMFit", chunk_size: int = 100) -> pd.DataFrame:
                 exp_mu_chunk[..., :, k] = expit(mu_chunk[..., :, k]) * pop_k
                 baseline_contrib_chunk[..., :, k] = expit(mu_chunk[..., :, k] - cc_sum_chunk[..., :, k]) * pop_k
                 total_media_chunk[..., :, k] = exp_mu_chunk[..., :, k] - baseline_contrib_chunk[..., :, k]
+                limit_chunk = expit(mu_chunk[..., :, k]) * (1 - expit(mu_chunk[..., :, k])) * pop_k
             elif likelihood == "lognormal":
                 sigma_chunk = precomputed_sigma[kpi][start_idx:end_idx] if is_mcmc else precomputed_sigma[kpi]
                 exp_mu_chunk[..., :, k] = np.exp(mu_chunk[..., :, k] + sigma_chunk**2 / 2.0)
                 baseline_contrib_chunk[..., :, k] = np.exp(mu_chunk[..., :, k] - cc_sum_chunk[..., :, k] + sigma_chunk**2 / 2.0)
                 total_media_chunk[..., :, k] = baseline_contrib_chunk[..., :, k] * np.expm1(cc_sum_chunk[..., :, k])
+                limit_chunk = baseline_contrib_chunk[..., :, k]
             else:
                 exp_mu_chunk[..., :, k] = np.exp(mu_chunk[..., :, k])
                 baseline_contrib_chunk[..., :, k] = np.exp(mu_chunk[..., :, k] - cc_sum_chunk[..., :, k])
                 total_media_chunk[..., :, k] = baseline_contrib_chunk[..., :, k] * np.expm1(cc_sum_chunk[..., :, k])
-
-        safe_cc_sum_chunk = np.where(cc_sum_chunk == 0, 1.0, cc_sum_chunk)
-        media_ratio_chunk = np.where(cc_sum_chunk == 0, 0.0, total_media_chunk / safe_cc_sum_chunk)
+                limit_chunk = baseline_contrib_chunk[..., :, k]
+                
+            safe_cc_sum_k = np.where(cc_sum_chunk[..., :, k] == 0, 1.0, cc_sum_chunk[..., :, k])
+            media_ratio_chunk[..., :, k] = np.where(
+                cc_sum_chunk[..., :, k] == 0, 
+                limit_chunk, 
+                total_media_chunk[..., :, k] / safe_cc_sum_k
+            )
 
         baseline_contrib_mean += baseline_contrib_chunk.sum(axis=0) / S
         for ci in range(C):
