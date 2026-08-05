@@ -58,7 +58,7 @@ def hill_saturation_pt(X, alpha, k):
     a = alpha[None, None, :]
     kk = k[None, None, :]
     # Clip to non-negative: fractional alpha on negative X yields NaN in real arithmetic
-    X_safe = pt.clip(X, 0.0, np.inf)
+    X_safe = pt.clip(X, 1e-9, np.inf)
     x_pow = X_safe ** a
     k_pow = kk ** a
     return x_pow / (x_pow + k_pow + 1e-9)
