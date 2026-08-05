@@ -60,32 +60,47 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
         S, T, G, K, C = cc_val.shape
     else:
         T, G, K, C = cc_val.shape
+        S = 1
+        mu_val = mu_val[np.newaxis, ...]
+        cc_val = cc_val[np.newaxis, ...]
 
-    cc_sum = cc_val.sum(axis=-1)
+    chunk_size = 100
+    baseline_contrib_mean = np.zeros((T, G, K))
+    channel_contribs_mean = [np.zeros((T, G, K)) for _ in range(C)]
 
-    exp_mu = np.zeros_like(mu_val)
-    baseline_contrib = np.zeros_like(mu_val)
-    total_media = np.zeros_like(mu_val)
-    for k, kpi in enumerate(kpis):
-        likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
-        if likelihood == "binomial":
-            pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
-            exp_mu[..., :, k] = expit(mu_val[..., :, k]) * pop_k
-            baseline_contrib[..., :, k] = expit(mu_val[..., :, k] - cc_sum[..., :, k]) * pop_k
-            total_media[..., :, k] = exp_mu[..., :, k] - baseline_contrib[..., :, k]
-        elif likelihood == "lognormal":
-            sigma_val = get_sigma_val(fit, kpi, mu_val.ndim)
-            exp_mu[..., :, k] = np.exp(mu_val[..., :, k] + sigma_val**2 / 2.0)
-            baseline_contrib[..., :, k] = np.exp(mu_val[..., :, k] - cc_sum[..., :, k] + sigma_val**2 / 2.0)
-            total_media[..., :, k] = baseline_contrib[..., :, k] * np.expm1(cc_sum[..., :, k])
-        else:
-            exp_mu[..., :, k] = np.exp(mu_val[..., :, k])
-            baseline_contrib[..., :, k] = np.exp(mu_val[..., :, k] - cc_sum[..., :, k])
-            total_media[..., :, k] = baseline_contrib[..., :, k] * np.expm1(cc_sum[..., :, k])
+    for start_idx in range(0, S, chunk_size):
+        end_idx = min(start_idx + chunk_size, S)
+        mu_chunk = mu_val[start_idx:end_idx]
+        cc_chunk = cc_val[start_idx:end_idx]
+        
+        cc_sum_chunk = cc_chunk.sum(axis=-1)
+        exp_mu_chunk = np.zeros_like(mu_chunk)
+        baseline_contrib_chunk = np.zeros_like(mu_chunk)
+        total_media_chunk = np.zeros_like(mu_chunk)
+        
+        for k, kpi in enumerate(kpis):
+            likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+            if likelihood == "binomial":
+                pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
+                exp_mu_chunk[..., :, k] = expit(mu_chunk[..., :, k]) * pop_k
+                baseline_contrib_chunk[..., :, k] = expit(mu_chunk[..., :, k] - cc_sum_chunk[..., :, k]) * pop_k
+                total_media_chunk[..., :, k] = exp_mu_chunk[..., :, k] - baseline_contrib_chunk[..., :, k]
+            elif likelihood == "lognormal":
+                sigma_val = get_sigma_val(fit, kpi, mu_chunk.ndim)
+                exp_mu_chunk[..., :, k] = np.exp(mu_chunk[..., :, k] + sigma_val**2 / 2.0)
+                baseline_contrib_chunk[..., :, k] = np.exp(mu_chunk[..., :, k] - cc_sum_chunk[..., :, k] + sigma_val**2 / 2.0)
+                total_media_chunk[..., :, k] = baseline_contrib_chunk[..., :, k] * np.expm1(cc_sum_chunk[..., :, k])
+            else:
+                exp_mu_chunk[..., :, k] = np.exp(mu_chunk[..., :, k])
+                baseline_contrib_chunk[..., :, k] = np.exp(mu_chunk[..., :, k] - cc_sum_chunk[..., :, k])
+                total_media_chunk[..., :, k] = baseline_contrib_chunk[..., :, k] * np.expm1(cc_sum_chunk[..., :, k])
 
-    # Guard against Σcc == 0 (no media spend → channel shares are undefined)
-    safe_cc_sum = np.where(cc_sum == 0, 1.0, cc_sum)
-    media_ratio = np.where(cc_sum == 0, 0.0, total_media / safe_cc_sum)
+        safe_cc_sum_chunk = np.where(cc_sum_chunk == 0, 1.0, cc_sum_chunk)
+        media_ratio_chunk = np.where(cc_sum_chunk == 0, 0.0, total_media_chunk / safe_cc_sum_chunk)
+
+        baseline_contrib_mean += baseline_contrib_chunk.sum(axis=0) / S
+        for ci in range(C):
+            channel_contribs_mean[ci] += (media_ratio_chunk * cc_chunk[..., ci]).sum(axis=0) / S
 
     n_cells = T * G * K
 
@@ -106,16 +121,10 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
     channel_labels = np.repeat(np.array(["baseline"] + list(channels)), n_cells)
 
     # Contribution values: baseline block then C channel blocks
-    baseline_flat = (baseline_contrib.mean(axis=0) if is_mcmc else baseline_contrib).flatten(order='C')
+    baseline_flat = baseline_contrib_mean.flatten(order='C')
     channel_contribs = []
     for ci in range(C):
-        cc_c = cc_val[..., ci]
-        if is_mcmc:
-            contrib_mean = (media_ratio * cc_c).mean(axis=0)
-            channel_contribs.append(contrib_mean.flatten(order='C'))
-        else:
-            contrib_c = media_ratio * cc_c
-            channel_contribs.append(contrib_c.flatten(order='C'))
+        channel_contribs.append(channel_contribs_mean[ci].flatten(order='C'))
 
     all_contributions = np.concatenate([baseline_flat] + channel_contribs)
 
@@ -161,18 +170,46 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
         S, T, G, K, C = cc_val.shape
     else:
         T, G, K, C = cc_val.shape
+        S = 1
+        mu_val = mu_val[np.newaxis, ...]
+        cc_val = cc_val[np.newaxis, ...]
 
-    exp_mu = np.zeros_like(mu_val)
-    for k, kpi in enumerate(kpis):
-        likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
-        if likelihood == "binomial":
-            pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
-            exp_mu[..., :, k] = expit(mu_val[..., :, k]) * pop_k
-        elif likelihood == "lognormal":
-            sigma_val = get_sigma_val(fit, kpi, mu_val.ndim)
-            exp_mu[..., :, k] = np.exp(mu_val[..., :, k] + sigma_val**2 / 2.0)
-        else:
-            exp_mu[..., :, k] = np.exp(mu_val[..., :, k])
+    chunk_size = 100
+    channel_contribs_mean = [np.zeros((T, G, K)) for _ in range(C)]
+
+    for start_idx in range(0, S, chunk_size):
+        end_idx = min(start_idx + chunk_size, S)
+        mu_chunk = mu_val[start_idx:end_idx]
+        cc_chunk = cc_val[start_idx:end_idx]
+        
+        exp_mu_chunk = np.zeros_like(mu_chunk)
+        for k, kpi in enumerate(kpis):
+            likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+            if likelihood == "binomial":
+                pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
+                exp_mu_chunk[..., :, k] = expit(mu_chunk[..., :, k]) * pop_k
+            elif likelihood == "lognormal":
+                sigma_val = get_sigma_val(fit, kpi, mu_chunk.ndim)
+                exp_mu_chunk[..., :, k] = np.exp(mu_chunk[..., :, k] + sigma_val**2 / 2.0)
+            else:
+                exp_mu_chunk[..., :, k] = np.exp(mu_chunk[..., :, k])
+                
+        for ci in range(C):
+            cc_c_chunk = cc_chunk[..., ci]
+            val_chunk = np.empty((end_idx - start_idx, T, G, K), dtype=mu_chunk.dtype)
+            
+            for k, kpi in enumerate(kpis):
+                likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+                if likelihood == "binomial":
+                    pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
+                    val_chunk[..., k] = exp_mu_chunk[..., :, k] - (expit(mu_chunk[..., :, k] - cc_c_chunk[..., :, k]) * pop_k)
+                elif likelihood == "lognormal":
+                    sigma_val = get_sigma_val(fit, kpi, mu_chunk.ndim)
+                    val_chunk[..., k] = exp_mu_chunk[..., :, k] - np.exp(mu_chunk[..., :, k] - cc_c_chunk[..., :, k] + sigma_val**2 / 2.0)
+                else:
+                    val_chunk[..., k] = exp_mu_chunk[..., :, k] - np.exp(mu_chunk[..., :, k] - cc_c_chunk[..., :, k])
+                    
+            channel_contribs_mean[ci] += val_chunk.sum(axis=0) / S
 
     n_cells = T * G * K
 
@@ -193,26 +230,7 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
 
     channel_contribs = []
     for ci in range(C):
-        cc_c = cc_val[..., ci]
-        contrib_mean = np.empty((T, G, K), dtype=mu_val.dtype)
-        
-        for k, kpi in enumerate(kpis):
-            likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
-            if likelihood == "binomial":
-                pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
-                val = exp_mu[..., :, k] - (expit(mu_val[..., :, k] - cc_c[..., :, k]) * pop_k)
-            elif likelihood == "lognormal":
-                sigma_val = get_sigma_val(fit, kpi, mu_val.ndim)
-                val = exp_mu[..., :, k] - np.exp(mu_val[..., :, k] - cc_c[..., :, k] + sigma_val**2 / 2.0)
-            else:
-                val = exp_mu[..., :, k] - np.exp(mu_val[..., :, k] - cc_c[..., :, k])
-            
-            if is_mcmc:
-                contrib_mean[..., k] = val.mean(axis=0)
-            else:
-                contrib_mean[..., k] = val
-                
-        channel_contribs.append(contrib_mean.flatten(order='C'))
+        channel_contribs.append(channel_contribs_mean[ci].flatten(order='C'))
 
     all_contributions = np.concatenate(channel_contribs)
 
