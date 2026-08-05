@@ -56,6 +56,7 @@ class HierarchicalMMM:
         self._fourier_matrix: Optional[np.ndarray] = None
         self._pop_array: Optional[np.ndarray] = None
         self._calibration_targets: list = []
+        self._last_experiments = None
 
     @property
     def model(self) -> "Optional[pm.Model]":
@@ -108,6 +109,13 @@ class HierarchicalMMM:
             diffs = pd.Series(data.times).diff().dropna()
             median_days = diffs.dt.days.median()
             period = 365.25 / max(median_days, 1.0)
+            
+            standard_periods = [1.0, 4.0, 12.0, 52.17, 365.25]
+            if not any(abs(period - sp) < 0.15 * sp for sp in standard_periods):
+                logger.warning(
+                    "Inferred seasonality period (%.2f) deviates significantly from standard cyclic patterns (e.g. 12, 52, 365).",
+                    period
+                )
         else:
             period = 52.0  # fallback
 
@@ -221,6 +229,8 @@ class HierarchicalMMM:
             self._calibration_targets = targets
         else:
             self._calibration_targets = []
+            
+        self._last_experiments = experiments
 
         return model
 
@@ -254,6 +264,7 @@ class HierarchicalMMM:
             or self._data is not data
             or (experiments is not None and not self._calibration_targets)
             or (experiments is None and bool(self._calibration_targets))
+            or experiments is not getattr(self, "_last_experiments", object())
         ):
             self.build_model(data, experiments=experiments)
 
