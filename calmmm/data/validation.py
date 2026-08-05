@@ -64,7 +64,8 @@ def _check_all_zero_spend(dataset: MMMData, result: ValidationResult) -> None:
 def _check_temporal_continuity(dataset: MMMData, result: ValidationResult) -> None:
     diffs = pd.Series(dataset.times).diff().dropna()
     if not diffs.empty:
-        if (diffs.dt.days.max() - diffs.dt.days.min()) > 3:
+        median_gap = diffs.dt.days.median()
+        if median_gap > 0 and (diffs.dt.days.max() > 1.5 * median_gap):
             result.errors.append(
                 "Dataset has missing dates or irregular gaps, which breaks sequential adstock and seasonality assumptions."
             )
