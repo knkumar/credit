@@ -140,6 +140,15 @@ def _check_missing_outcomes(dataset: MMMData, result: ValidationResult) -> None:
             f"but found {len(dataset.media)}. Please provide balanced panel data."
         )
 
+    if dataset.controls is not None and not dataset.controls.empty:
+        n_controls = dataset.controls["control"].nunique()
+        expected_controls_len = dataset.n_times * dataset.n_geos * n_controls
+        if len(dataset.controls) != expected_controls_len:
+            result.errors.append(
+                f"Incomplete controls panel: expected {expected_controls_len} rows "
+                f"but found {len(dataset.controls)}. Please provide balanced panel data."
+            )
+
 
 def _check_missing_features(dataset: MMMData, result: ValidationResult) -> None:
     if dataset.media is not None and "spend" in dataset.media.columns:
