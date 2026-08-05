@@ -5,6 +5,7 @@ __all__ = [
     "CalibrationTarget",
     "ChannelInteraction", "InteractionGraph",
     "channel_contributions", "marginal_contributions", "compute_roi", "saturation_curve",
+    "spend_response_report",
 ]
 
 
@@ -29,13 +30,14 @@ def __getattr__(name):
         globals()["ChannelInteraction"] = ChannelInteraction
         globals()["InteractionGraph"] = InteractionGraph
         return globals()[name]
-    if name in ("channel_contributions", "marginal_contributions", "compute_roi", "saturation_curve"):
+    if name in ("channel_contributions", "marginal_contributions", "compute_roi", "saturation_curve", "spend_response_report"):
         from calmmm.attribution.contributions import channel_contributions, marginal_contributions
         from calmmm.attribution.roi import compute_roi
-        from calmmm.attribution.curves import saturation_curve
+        from calmmm.attribution.curves import saturation_curve, spend_response_report
         globals()["channel_contributions"] = channel_contributions
         globals()["marginal_contributions"] = marginal_contributions
         globals()["compute_roi"] = compute_roi
         globals()["saturation_curve"] = saturation_curve
+        globals()["spend_response_report"] = spend_response_report
         return globals()[name]
     raise AttributeError(f"module 'calmmm' has no attribute {name!r}")

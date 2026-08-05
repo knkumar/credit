@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from calmmm.calibration.targets import IncrementalityTests
 
 
-def eval_mu_and_channel_contrib(fit: "MMMFit"):
+def eval_mu_and_channel_contrib(fit: "MMMFit") -> tuple[np.ndarray, np.ndarray]:
     """Return (mu, channel_contrib) as numpy arrays. 
     Shape [S, T, G, K] and [S, T, G, K, C] for traces, or [T, G, K] and [T, G, K, C] for MAP."""
     if fit.map_params is not None:

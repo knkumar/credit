@@ -245,7 +245,7 @@ class HierarchicalMMM:
         self,
         data: MMMData,
         *,
-        experiments=None,
+        experiments: Optional["IncrementalityTests"] = None,
         mode: str = "sample",
         **kwargs,
     ) -> "MMMFit":

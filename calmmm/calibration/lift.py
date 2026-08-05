@@ -71,7 +71,7 @@ def compute_model_lift(
             pop_exp = fit._mmm._pop_array[fit._mmm._train_mask][t][:, g, k]
             lifts = (expit(mu_exp) * pop_exp - expit(mu_exp - cc_total) * pop_exp).sum(axis=(-2, -1) if is_mcmc else None)
         elif likelihood == "lognormal":
-            sigma_val = get_sigma_val(fit, kpi_name, mu_exp.ndim)
+            sigma_val = get_sigma_val(fit, kpi_name, mu_val.ndim)
             lifts = (np.exp(mu_exp + sigma_val**2 / 2.0) - np.exp(mu_exp - cc_total + sigma_val**2 / 2.0)).sum(axis=(-2, -1) if is_mcmc else None)
         else:
             lifts = (np.exp(mu_exp) - np.exp(mu_exp - cc_total)).sum(axis=(-2, -1) if is_mcmc else None)

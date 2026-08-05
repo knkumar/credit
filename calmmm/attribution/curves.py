@@ -76,7 +76,7 @@ def spend_response_report(
     for channel in fit.data.channels:
         spend_col = spend_columns.get(channel)
         if spend_col is None or spend_col not in panel.columns:
-            continue
+            raise ValueError(f"Mapped spend column {spend_col!r} for channel {channel!r} not found in dataset.")
 
         curve = saturation_curve(fit, channel=channel, n_points=n_points).sort_values("spend")
         current_spend = float(panel[spend_col].mean())
