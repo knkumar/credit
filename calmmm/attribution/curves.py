@@ -34,17 +34,25 @@ def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50) -> pd.Data
 
     c_idx = channels.index(channel)
     hill_alpha, hill_k = _eval_hill_params(fit)
-    alpha_c = float(hill_alpha[c_idx])
-    k_c = float(hill_k[c_idx])
+    alpha_c = hill_alpha[..., c_idx]
+    k_c = hill_k[..., c_idx]
 
     media_max = fit._mmm._media_max  # [C]
     max_spend = float(media_max[c_idx])
 
     x = np.linspace(0.0, 2.0 * max_spend, n_points)
     x_scaled = x / max(max_spend, 1e-8)
+    
+    if np.ndim(alpha_c) > 0:
+        alpha_c = alpha_c[..., np.newaxis]
+        k_c = k_c[..., np.newaxis]
+
     x_pow = np.clip(x_scaled, 0.0, None) ** alpha_c
     k_pow = k_c ** alpha_c
     saturation = x_pow / (x_pow + k_pow + 1e-9)
+
+    if np.ndim(saturation) > 1:
+        saturation = saturation.mean(axis=tuple(range(np.ndim(saturation) - 1)))
 
     return pd.DataFrame({"spend": x, "saturation": saturation, "channel": channel})
 
@@ -110,7 +118,7 @@ def spend_response_report(
 
 
 def _eval_hill_params(fit):
-    """Return (hill_alpha [C], hill_k [C]) as numpy arrays."""
+    """Return (hill_alpha, hill_k) as numpy arrays. If trace, preserves sample dimensions."""
     if fit.map_params is not None:
         return (
             np.array(fit.map_params["hill_alpha"]),
@@ -118,7 +126,7 @@ def _eval_hill_params(fit):
         )
     if fit.trace is not None:
         return (
-            fit.trace.posterior["hill_alpha"].values.mean(axis=(0, 1)),
-            fit.trace.posterior["hill_k"].values.mean(axis=(0, 1)),
+            fit.trace.posterior["hill_alpha"].values,
+            fit.trace.posterior["hill_k"].values,
         )
     raise ValueError("MMMFit has neither map_params nor trace.")
