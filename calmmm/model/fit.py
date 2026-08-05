@@ -235,58 +235,39 @@ class MMMFit:
 
         obs_holdout = mmm._obs_array[holdout_mask]  # [T_holdout, G, K]
 
-        # Update data in the existing model to evaluate mu over all time steps
-        full_model = self.model
-        with full_model:
-            new_data = {
-                "X_media": mmm._media_scaled,
-                "fourier_features": mmm._fourier_matrix,
-                "pop_array": np.nan_to_num(mmm._pop_array, nan=1.0),
-            }
-            if getattr(mmm, "_ctrl_array", None) is not None:
-                new_data["ctrl_array"] = mmm._ctrl_array
-            pm.set_data(new_data, coords={"time": mmm._data.times})
+        # Rebuild a full-T model context to avoid mutating the training graph
+        eval_mmm = type(mmm)(
+            priors=mmm.priors,
+            n_fourier_pairs=mmm.n_fourier_pairs,
+            holdout_fraction=0.0,
+            interaction_graph=mmm.interaction_graph,
+        )
+        full_model = eval_mmm.build_model(mmm._data, experiments=mmm._last_experiments)
 
-        try:
-            if self.map_params is not None:
-                # Evaluate mu on the full-T model using the *trained* parameter values.
-                latent_init = full_model.initial_point()
-                latent_params = latent_init.copy()
-                latent_params.update({k: v for k, v in self.map_params.items() if k in latent_params})
-                with full_model:
-                    if not hasattr(self, "_compiled_mu_fn"):
-                        self._compiled_mu_fn = full_model.compile_fn(full_model["mu"])
-                    fn = self._compiled_mu_fn
-                    mu_val = fn(latent_params)
-                mu_holdout = np.array(mu_val)[holdout_mask]
-    
-            elif self.trace is not None:
-                with full_model:
-                    ppc = pm.sample_posterior_predictive(
-                        self.trace,
-                        var_names=["mu"],
-                        progressbar=False,
-                        predictions=True,
-                    )
-                if hasattr(ppc, "predictions"):
-                    mu_samples = ppc.predictions["mu"].values
-                else:
-                    mu_samples = ppc.posterior_predictive["mu"].values
-                mu_samples = mu_samples.reshape(-1, *mu_samples.shape[2:])
-                mu_holdout = mu_samples[:, holdout_mask, ...]  # [S, T_holdout, G, K]
-    
-            else:
-                raise ValueError("No params or trace available for prediction.")
-        finally:
+        if self.map_params is not None:
+            # Evaluate mu on the full-T model using the *trained* parameter values.
             with full_model:
-                new_data_train = {
-                    "X_media": mmm._media_scaled[mmm._train_mask],
-                    "fourier_features": mmm._fourier_matrix[mmm._train_mask],
-                    "pop_array": np.nan_to_num(mmm._pop_array[mmm._train_mask], nan=1.0),
-                }
-                if getattr(mmm, "_ctrl_array", None) is not None:
-                    new_data_train["ctrl_array"] = mmm._ctrl_array[mmm._train_mask]
-                pm.set_data(new_data_train, coords={"time": [t for i, t in enumerate(mmm._data.times) if mmm._train_mask[i]]})
+                fn = full_model.compile_fn(full_model["mu"])
+                mu_val = fn(self.map_params)
+            mu_holdout = np.array(mu_val)[holdout_mask]
+
+        elif self.trace is not None:
+            with full_model:
+                ppc = pm.sample_posterior_predictive(
+                    self.trace,
+                    var_names=["mu"],
+                    progressbar=False,
+                    predictions=True,
+                )
+            if hasattr(ppc, "predictions"):
+                mu_samples = ppc.predictions["mu"].values
+            else:
+                mu_samples = ppc.posterior_predictive["mu"].values
+            mu_samples = mu_samples.reshape(-1, *mu_samples.shape[2:])
+            mu_holdout = mu_samples[:, holdout_mask, ...]  # [S, T_holdout, G, K]
+
+        else:
+            raise ValueError("No params or trace available for prediction.")
 
         # Apply inverse link to get predicted mean
         pred_mean = np.zeros_like(mu_holdout)  # [S?, T_holdout, G, K]
