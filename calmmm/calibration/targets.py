@@ -124,7 +124,7 @@ def build_calibration_targets(
                 mask_g = pd.Series(True, index=df.index)
             mask_k = df["kpi"] == exp.kpi
             sliced_df = df[mask_t & mask_g & mask_k]
-            if "population" not in sliced_df.columns or sliced_df["population"].isna().any():
+            if "population" not in sliced_df.columns or pd.isna(sliced_df["population"]).any():
                 raise ValueError(
                     f"Experiment '{exp.test_id}' references a binomial KPI ('{exp.kpi}') but the population data "
                     f"contains missing/NaN values in the experiment window. Cannot calibrate against binomial targets "
