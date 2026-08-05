@@ -38,6 +38,7 @@ def validate_mmmdata(dataset: MMMData) -> ValidationResult:
     _check_missing_features(dataset, result)
     _check_count_kpi_integrity(dataset, result)
     _check_lognormal_kpi_integrity(dataset, result)
+    _check_gaussian_kpi_integrity(dataset, result)
     _check_binomial_kpi_has_population(dataset, result)
     _check_binomial_not_exceeds_population(dataset, result)
     _check_weak_media_variation(dataset, result)
@@ -200,6 +201,23 @@ def _check_lognormal_kpi_integrity(dataset: MMMData, result: ValidationResult) -
                     f"KPI '{kpi}' has likelihood='lognormal' but "
                     f"{int(non_pos_mask.sum())} zero or negative outcome value(s) found. "
                     "Lognormal likelihood requires strictly positive values."
+                )
+
+
+def _check_gaussian_kpi_integrity(dataset: MMMData, result: ValidationResult) -> None:
+    for _, row in dataset.kpi_metadata.iterrows():
+        if row["likelihood"] == "gaussian":
+            kpi = row["kpi"]
+            obs = dataset.observations.loc[
+                dataset.observations["kpi"] == kpi, "outcome"
+            ].dropna()
+            obs_numeric = pd.to_numeric(obs, errors='coerce')
+            neg_mask = obs_numeric < 0
+            if neg_mask.any():
+                result.errors.append(
+                    f"KPI '{kpi}' has likelihood='gaussian' but "
+                    f"{int(neg_mask.sum())} negative outcome value(s) found. "
+                    "Since the model uses a strictly positive multiplicative log-link, negative outcomes cannot be modeled."
                 )
 
 

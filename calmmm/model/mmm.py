@@ -123,6 +123,8 @@ class HierarchicalMMM:
 
         diffs = pd.Series(data.times).diff().dropna()
         median_days = diffs.dt.total_seconds().median() / 86400.0
+        if median_days <= 0.0:
+            raise ValueError("The dataset contains zero-spaced or completely duplicated time steps.")
         period = 365.25 / median_days
         if 11.5 < period < 12.5:
             period = 12.0
@@ -134,9 +136,11 @@ class HierarchicalMMM:
                 period
             )
 
-        # Fourier features: t = 0-based index
+        # Fourier features: t = actual elapsed time normalized
+        elapsed_days = (pd.Series(data.times) - data.times[0]).dt.total_seconds() / 86400.0
+        t_actual = (elapsed_days / median_days).to_numpy(dtype=float)
         fourier_matrix = fourier_features(
-            t=np.arange(T, dtype=float),
+            t=t_actual,
             period=period,
             n_pairs=self.n_fourier_pairs,
         ).astype(np.float64)
@@ -160,7 +164,9 @@ class HierarchicalMMM:
                     obs_mean_log[k, :] = np.nan_to_num(np.nanmean(np.log(np.maximum(obs_array[train_mask, :, k], 1e-8)), axis=0))
                 else:
                     obs_mean = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k], axis=0), nan=0.0)
-                    obs_mean_log[k, :] = np.log(np.maximum(obs_mean, 1e-8))
+                    if (obs_mean <= 0).any():
+                        raise ValueError(f"Training slice contains zero or negative average outcomes for KPI '{kpi}', which are incompatible with the log-link prior initialization.")
+                    obs_mean_log[k, :] = np.log(obs_mean)
 
         # Store for use in fit()
         self._obs_array = obs_array
