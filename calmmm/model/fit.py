@@ -32,6 +32,20 @@ def eval_mu_and_channel_contrib(fit: "MMMFit"):
     raise ValueError("MMMFit has neither map_params nor trace.")
 
 
+def get_sigma_val(fit: "MMMFit", kpi: str, target_ndim: int) -> float | np.ndarray:
+    """Helper to extract and reshape the lognormal sigma parameter for a given KPI."""
+    if fit.map_params is not None and f"sigma_{kpi}" in fit.map_params:
+        sigma_val = fit.map_params[f"sigma_{kpi}"]
+    elif fit.trace is not None and f"sigma_{kpi}" in fit.trace.posterior:
+        sigma_samples = fit.trace.posterior[f"sigma_{kpi}"].values
+        sigma_val = sigma_samples.reshape(-1)
+        while sigma_val.ndim < target_ndim - 1:
+            sigma_val = np.expand_dims(sigma_val, axis=-1)
+    else:
+        sigma_val = 0.0
+    return sigma_val
+
+
 def _regression_metrics(
     observed: np.ndarray,
     predicted: np.ndarray,
@@ -220,14 +234,15 @@ class MMMFit:
         # Update data in the existing model to evaluate mu over all time steps
         full_model = self.model
         with full_model:
-            pm.set_data({
+            new_data = {
                 "X_media": mmm._media_scaled,
                 "fourier_features": mmm._fourier_matrix,
                 "obs_array": mmm._obs_array,
                 "pop_array": mmm._pop_array,
-            }, coords={"time": mmm._data.times})
+            }
             if getattr(mmm, "_ctrl_array", None) is not None:
-                pm.set_data({"ctrl_array": mmm._ctrl_array})
+                new_data["ctrl_array"] = mmm._ctrl_array
+            pm.set_data(new_data, coords={"time": mmm._data.times})
 
         try:
             if self.map_params is not None:
@@ -259,14 +274,15 @@ class MMMFit:
                 raise ValueError("No params or trace available for prediction.")
         finally:
             with full_model:
-                pm.set_data({
+                new_data_train = {
                     "X_media": mmm._media_scaled[mmm._train_mask],
                     "fourier_features": mmm._fourier_matrix[mmm._train_mask],
                     "obs_array": mmm._obs_array[mmm._train_mask],
                     "pop_array": mmm._pop_array[mmm._train_mask],
-                }, coords={"time": [t for i, t in enumerate(mmm._data.times) if mmm._train_mask[i]]})
+                }
                 if getattr(mmm, "_ctrl_array", None) is not None:
-                    pm.set_data({"ctrl_array": mmm._ctrl_array[mmm._train_mask]})
+                    new_data_train["ctrl_array"] = mmm._ctrl_array[mmm._train_mask]
+                pm.set_data(new_data_train, coords={"time": [t for i, t in enumerate(mmm._data.times) if mmm._train_mask[i]]})
 
         # Apply inverse link to get predicted mean
         pred_mean = np.zeros_like(mu_holdout)  # [S?, T_holdout, G, K]
@@ -277,15 +293,7 @@ class MMMFit:
                 pop_k = mmm._pop_array[holdout_mask][..., k]
                 pred_mean[..., k] = expit(mu_holdout[..., k]) * pop_k
             elif likelihood == "lognormal":
-                if self.map_params is not None and f"sigma_{kpi}" in self.map_params:
-                    sigma_val = self.map_params[f"sigma_{kpi}"]
-                elif self.trace is not None and f"sigma_{kpi}" in self.trace.posterior:
-                    sigma_samples = self.trace.posterior[f"sigma_{kpi}"].values
-                    sigma_val = sigma_samples.reshape(-1)
-                    while sigma_val.ndim < mu_holdout.ndim - 1:
-                        sigma_val = np.expand_dims(sigma_val, axis=-1)
-                else:
-                    sigma_val = 0.0
+                sigma_val = get_sigma_val(self, kpi, mu_holdout.ndim)
                 pred_mean[..., k] = np.exp(mu_holdout[..., k] + sigma_val**2 / 2.0)
             else:
                 pred_mean[..., k] = np.exp(mu_holdout[..., k])
@@ -319,15 +327,7 @@ class MMMFit:
                 pop_k = mmm._pop_array[mmm._train_mask][..., k]
                 predicted[..., k] = expit(mu[..., k]) * pop_k
             elif likelihood == "lognormal":
-                if self.map_params is not None and f"sigma_{kpi}" in self.map_params:
-                    sigma_val = self.map_params[f"sigma_{kpi}"]
-                elif self.trace is not None and f"sigma_{kpi}" in self.trace.posterior:
-                    sigma_samples = self.trace.posterior[f"sigma_{kpi}"].values
-                    sigma_val = sigma_samples.reshape(-1)
-                    while sigma_val.ndim < mu.ndim - 1:
-                        sigma_val = np.expand_dims(sigma_val, axis=-1)
-                else:
-                    sigma_val = 0.0
+                sigma_val = get_sigma_val(self, kpi, mu.ndim)
                 predicted[..., k] = np.exp(mu[..., k] + sigma_val**2 / 2.0)
             else:
                 predicted[..., k] = np.exp(mu[..., k])

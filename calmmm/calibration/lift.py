@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from calmmm.model.fit import eval_mu_and_channel_contrib as _eval_mu_and_channel_contrib
+from calmmm.model.fit import get_sigma_val
 
 if TYPE_CHECKING:
     from calmmm.calibration.targets import CalibrationTarget
@@ -70,15 +71,7 @@ def compute_model_lift(
             pop_exp = fit._mmm._pop_array[fit._mmm._train_mask][t][:, g, k]
             lifts = (expit(mu_exp) * pop_exp - expit(mu_exp - cc_total) * pop_exp).sum(axis=(-2, -1) if is_mcmc else None)
         elif likelihood == "lognormal":
-            if fit.map_params is not None and f"sigma_{kpi_name}" in fit.map_params:
-                sigma_val = fit.map_params[f"sigma_{kpi_name}"]
-            elif fit.trace is not None and f"sigma_{kpi_name}" in fit.trace.posterior:
-                sigma_samples = fit.trace.posterior[f"sigma_{kpi_name}"].values
-                sigma_val = sigma_samples.reshape(-1)
-                while sigma_val.ndim < mu_exp.ndim:
-                    sigma_val = np.expand_dims(sigma_val, axis=-1)
-            else:
-                sigma_val = 0.0
+            sigma_val = get_sigma_val(fit, kpi_name, mu_exp.ndim)
             lifts = (np.exp(mu_exp + sigma_val**2 / 2.0) - np.exp(mu_exp - cc_total + sigma_val**2 / 2.0)).sum(axis=(-2, -1) if is_mcmc else None)
         else:
             lifts = (np.exp(mu_exp) - np.exp(mu_exp - cc_total)).sum(axis=(-2, -1) if is_mcmc else None)
