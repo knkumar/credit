@@ -185,20 +185,32 @@ def _add_likelihood(
 
         elif likelihood == "negative_binomial":
             alpha_k = pm.HalfNormal(f"nb_alpha_{kpi}", sigma=priors.nb_alpha_sigma)
+            if isinstance(y_obs, pt.TensorVariable):
+                y_obs_discrete = pt.cast(y_obs, "int64")
+            else:
+                y_obs_discrete = np.ma.MaskedArray(
+                    y_obs.filled(0).astype("int64"), mask=y_obs.mask
+                )
             pm.NegativeBinomial(
                 f"obs_{kpi}",
                 mu=pm.math.exp(mu_k),
                 alpha=alpha_k,
-                observed=y_obs,
+                observed=y_obs_discrete,
             )
 
         elif likelihood == "binomial":
             n_pop = pop_array[:, :, k]
+            if isinstance(y_obs, pt.TensorVariable):
+                y_obs_discrete = pt.cast(y_obs, "int64")
+            else:
+                y_obs_discrete = np.ma.MaskedArray(
+                    y_obs.filled(0).astype("int64"), mask=y_obs.mask
+                )
             pm.Binomial(
                 f"obs_{kpi}",
                 n=pt.cast(n_pop, "int64"),
                 p=pm.math.sigmoid(mu_k),
-                observed=y_obs,
+                observed=y_obs_discrete,
             )
 
         else:
