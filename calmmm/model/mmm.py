@@ -120,7 +120,7 @@ class HierarchicalMMM:
         if 11.5 < period < 12.5:
             period = 12.0
         
-        standard_periods = [1.0, 4.0, 12.0, 52.17, 365.25]
+        standard_periods = [1.0, 4.0, 12.0, 26.0, 26.08, 52.17, 365.25]
         if not any(abs(period - sp) < 0.15 * sp for sp in standard_periods):
             logger.warning(
                 "Inferred seasonality period (%.2f) deviates significantly from standard cyclic patterns (e.g. 12, 52, 365).",
