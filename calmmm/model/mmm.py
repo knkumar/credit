@@ -141,17 +141,20 @@ class HierarchicalMMM:
 
         # Baseline intercept initialization: log(mean_outcome) per KPI×geo (logit for binomial)
         obs_mean_log = np.zeros((len(data.kpis), len(data.geos)))
-        for k, kpi in enumerate(data.kpis):
-            likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
-            if likelihood == "binomial":
-                p = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k] / np.maximum(pop_array[train_mask, :, k], 1.0), axis=0), nan=0.0)
-                p = np.clip(p, 1e-4, 1.0 - 1e-4)
-                obs_mean_log[k, :] = logit(p)
-            elif likelihood == "lognormal":
-                obs_mean_log[k, :] = np.nan_to_num(np.nanmean(np.log(np.maximum(obs_array[train_mask, :, k], 1e-8)), axis=0))
-            else:
-                obs_mean = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k], axis=0), nan=0.0)
-                obs_mean_log[k, :] = np.log(np.maximum(obs_mean, 1e-8))
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            for k, kpi in enumerate(data.kpis):
+                likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+                if likelihood == "binomial":
+                    p = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k] / np.maximum(pop_array[train_mask, :, k], 1.0), axis=0), nan=0.0)
+                    p = np.clip(p, 1e-4, 1.0 - 1e-4)
+                    obs_mean_log[k, :] = logit(p)
+                elif likelihood == "lognormal":
+                    obs_mean_log[k, :] = np.nan_to_num(np.nanmean(np.log(np.maximum(obs_array[train_mask, :, k], 1e-8)), axis=0))
+                else:
+                    obs_mean = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k], axis=0), nan=0.0)
+                    obs_mean_log[k, :] = np.log(np.maximum(obs_mean, 1e-8))
 
         # Store for use in fit()
         self._obs_array = obs_array
