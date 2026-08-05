@@ -166,8 +166,9 @@ class HierarchicalMMM:
         self._fourier_matrix = fourier_matrix
         self._pop_array = pop_array
         if ctrl_array is not None:
-            ctrl_std = np.where(ctrl_array.std(axis=0) == 0, 1.0, ctrl_array.std(axis=0))
-            self._ctrl_array = (ctrl_array - ctrl_array.mean(axis=0)) / ctrl_std
+            ctrl_train_raw = ctrl_array[train_mask]
+            ctrl_std = np.where(ctrl_train_raw.std(axis=0) == 0, 1.0, ctrl_train_raw.std(axis=0))
+            self._ctrl_array = (ctrl_array - ctrl_train_raw.mean(axis=0)) / ctrl_std
         else:
             self._ctrl_array = None
 
@@ -176,7 +177,7 @@ class HierarchicalMMM:
         fourier_train = fourier_matrix[train_mask]     # [T_train, F]
         obs_train = obs_array[train_mask]              # [T_train, G, K]
         pop_train = pop_array[train_mask]              # [T_train, G, K]
-        ctrl_train = ctrl_array[train_mask] if ctrl_array is not None else None  # [T_train, G, N] or None
+        ctrl_train = self._ctrl_array[train_mask] if self._ctrl_array is not None else None  # [T_train, G, N] or None
 
         coords["time"] = [t for i, t in enumerate(data.times) if train_mask[i]]
         with pm.Model(coords=coords) as model:
