@@ -65,20 +65,23 @@ def channel_contributions(fit: "MMMFit") -> pd.DataFrame:
 
     exp_mu = np.zeros_like(mu_val)
     baseline_contrib = np.zeros_like(mu_val)
+    total_media = np.zeros_like(mu_val)
     for k, kpi in enumerate(kpis):
         likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
         if likelihood == "binomial":
             pop_k = mmm._pop_array[mmm._train_mask][:, :, k]
             exp_mu[..., :, k] = expit(mu_val[..., :, k]) * pop_k
             baseline_contrib[..., :, k] = expit(mu_val[..., :, k] - cc_sum[..., :, k]) * pop_k
+            total_media[..., :, k] = exp_mu[..., :, k] - baseline_contrib[..., :, k]
         elif likelihood == "lognormal":
             sigma_val = get_sigma_val(fit, kpi, mu_val.ndim)
             exp_mu[..., :, k] = np.exp(mu_val[..., :, k] + sigma_val**2 / 2.0)
             baseline_contrib[..., :, k] = np.exp(mu_val[..., :, k] - cc_sum[..., :, k] + sigma_val**2 / 2.0)
+            total_media[..., :, k] = baseline_contrib[..., :, k] * np.expm1(cc_sum[..., :, k])
         else:
             exp_mu[..., :, k] = np.exp(mu_val[..., :, k])
             baseline_contrib[..., :, k] = np.exp(mu_val[..., :, k] - cc_sum[..., :, k])
-    total_media = exp_mu - baseline_contrib
+            total_media[..., :, k] = baseline_contrib[..., :, k] * np.expm1(cc_sum[..., :, k])
 
     # Guard against Σcc == 0 (no media spend → channel shares are undefined)
     safe_cc_sum = np.where(cc_sum == 0, 1.0, cc_sum)
@@ -188,7 +191,7 @@ def marginal_contributions(fit: "MMMFit") -> pd.DataFrame:
     channel_contribs = []
     for ci in range(C):
         cc_c = cc_val[..., ci]
-        contrib_c = np.zeros_like(mu_val)
+        contrib_c = np.empty_like(mu_val)
         for k, kpi in enumerate(kpis):
             likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
             if likelihood == "binomial":
