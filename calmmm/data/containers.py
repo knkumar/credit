@@ -197,6 +197,7 @@ class IncrementalityTests:
             return cast(value)
 
         experiments = []
+        seen_ids = set()
         for i, row in df.iterrows():
             def _parse_numeric(col_name):
                 if col_name and col_name in df.columns:
@@ -209,6 +210,9 @@ class IncrementalityTests:
             ci_hi = _parse_numeric(ci_upper)
 
             test_id = str(row["test_id"]) if "test_id" in df.columns else f"exp_{i}"
+            if test_id in seen_ids:
+                raise ValueError(f"Duplicate test_id found: '{test_id}'. Experiment test_ids must be unique.")
+            seen_ids.add(test_id)
 
             channel_val = row[channel]
             channels = (
