@@ -48,7 +48,7 @@ def test_build_coords_fourier_length(mmmdata):
 def test_build_coords_lists_are_sorted(mmmdata):
     coords = build_coords(mmmdata)
     assert coords["geo"] == sorted(coords["geo"])
-    assert coords["kpi"] == sorted(coords["kpi"])
+    # kpis are no longer sorted, they preserve user order
     assert coords["channel"] == sorted(coords["channel"])
     assert coords["time"] == sorted(coords["time"])
 

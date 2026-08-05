@@ -39,7 +39,7 @@ class MMMData:
 
     @functools.cached_property
     def kpis(self) -> list[str]:
-        return sorted(self.observations["kpi"].unique().tolist())
+        return self.observations["kpi"].unique().tolist()
 
     @functools.cached_property
     def geos(self) -> list[str]:
