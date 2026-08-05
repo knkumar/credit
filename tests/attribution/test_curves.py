@@ -9,8 +9,12 @@ class _FakeData:
     channels = ["search", "social"]
 
 
+class _FakeMMM:
+    _media_max = [400.0, 200.0]
+
 class _FakeFit:
     data = _FakeData()
+    _mmm = _FakeMMM()
 
 
 def test_spend_response_report_uses_saturation_curves(monkeypatch):

@@ -76,7 +76,11 @@ def spend_response_report(
         if spend_col is None or spend_col not in panel.columns:
             raise ValueError(f"Mapped spend column {spend_col!r} for channel {channel!r} not found in dataset.")
 
-        grid_mult = max(2.0, spend_multiplier)
+        spend_max = float(panel[spend_col].max())
+        required_spend = spend_max * spend_multiplier
+        media_max = float(fit._mmm._media_max[fit.data.channels.index(channel)])
+        required_mult = (required_spend / max(media_max, 1e-8)) * 1.1
+        grid_mult = max(2.0, spend_multiplier, required_mult)
         curve = saturation_curve(fit, channel=channel, n_points=n_points, grid_multiplier=grid_mult).sort_values("spend")
         spend_arr = panel[spend_col].dropna().values
         if len(spend_arr) == 0:

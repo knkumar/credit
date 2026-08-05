@@ -227,7 +227,7 @@ class IncrementalityTests:
             ci_lo = _parse_numeric(ci_lower)
             ci_hi = _parse_numeric(ci_upper)
 
-            test_id = str(row["test_id"]) if "test_id" in df.columns else f"exp_{i}"
+            test_id = str(row["test_id"]) if "test_id" in df.columns and pd.notna(row["test_id"]) else f"exp_{i}"
             if test_id in seen_ids:
                 raise ValueError(f"Duplicate test_id found: '{test_id}'. Experiment test_ids must be unique.")
             seen_ids.add(test_id)
