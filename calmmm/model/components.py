@@ -188,8 +188,8 @@ def _add_likelihood(
             if isinstance(y_obs, pt.TensorVariable):
                 y_obs_discrete = pt.cast(y_obs, "int64")
             else:
-                y_obs_discrete = np.ma.MaskedArray(
-                    y_obs.filled(0).astype("int64"), mask=y_obs.mask
+                y_obs_discrete = np.ma.array(
+                    np.nan_to_num(y_obs, nan=0).astype("int64"), mask=np.ma.getmask(y_obs)
                 )
             pm.NegativeBinomial(
                 f"obs_{kpi}",
@@ -203,8 +203,8 @@ def _add_likelihood(
             if isinstance(y_obs, pt.TensorVariable):
                 y_obs_discrete = pt.cast(y_obs, "int64")
             else:
-                y_obs_discrete = np.ma.MaskedArray(
-                    y_obs.filled(0).astype("int64"), mask=y_obs.mask
+                y_obs_discrete = np.ma.array(
+                    np.nan_to_num(y_obs, nan=0).astype("int64"), mask=np.ma.getmask(y_obs)
                 )
             pm.Binomial(
                 f"obs_{kpi}",
