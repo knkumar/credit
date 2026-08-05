@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -8,6 +9,7 @@ if TYPE_CHECKING:
     from calmmm.model.fit import MMMFit
 
 import numpy as np
+import pandas as pd
 import pymc as pm
 import pytensor.tensor as pt
 
@@ -119,7 +121,6 @@ class HierarchicalMMM:
         if len(data.times) < 2:
             raise ValueError("Insufficient data: at least 2 time steps are required.")
 
-        import pandas as pd
         diffs = pd.Series(data.times).diff().dropna()
         median_days = diffs.dt.total_seconds().median() / 86400.0
         period = 365.25 / median_days
@@ -147,7 +148,6 @@ class HierarchicalMMM:
 
         # Baseline intercept initialization: log(mean_outcome) per KPI×geo (logit for binomial)
         obs_mean_log = np.zeros((len(data.kpis), len(data.geos)))
-        import warnings
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             for k, kpi in enumerate(data.kpis):
