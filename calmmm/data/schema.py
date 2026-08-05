@@ -93,8 +93,12 @@ class ExperimentRow:
                 raise ValueError(
                     f"ci_upper ({self.ci_upper}) must be >= ci_lower ({self.ci_lower})"
                 )
-            from scipy.stats import norm
-            z = norm.ppf((1 + self.ci_level) / 2)
+            if self.calibration_likelihood == CalibrationLikelihood.STUDENT_T:
+                from scipy.stats import t
+                z = t.ppf((1 + self.ci_level) / 2, df=self.student_t_nu)
+            else:
+                from scipy.stats import norm
+                z = norm.ppf((1 + self.ci_level) / 2)
             self.se = (self.ci_upper - self.ci_lower) / (2 * z)
         
         if self.se <= 0 or math.isnan(self.se) or math.isinf(self.se):

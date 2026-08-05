@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 import numpy as np
+import pandas as pd
 import pymc as pm
 import pytensor.tensor as pt
 
@@ -148,7 +149,7 @@ def _add_likelihood(
     mu: pt.TensorVariable,
     obs_array: np.ndarray | pt.TensorVariable,
     pop_array: np.ndarray | pt.TensorVariable,
-    kpi_metadata,
+    kpi_metadata: pd.DataFrame,
     kpis: list[str],
     priors: PriorConfig,
 ) -> None:

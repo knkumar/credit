@@ -78,7 +78,7 @@ def spend_response_report(
 
         grid_mult = max(2.0, spend_multiplier)
         curve = saturation_curve(fit, channel=channel, n_points=n_points, grid_multiplier=grid_mult).sort_values("spend")
-        current_spend = float(panel[spend_col].mean())
+        current_spend = float(panel[spend_col].dropna().mean())
         if pd.isna(current_spend):
             logger.warning("Current spend is NaN for channel %r; skipping.", channel)
             continue
@@ -89,16 +89,16 @@ def spend_response_report(
         increased_response = float(
             np.interp(increased_spend, curve["spend"], curve["saturation"])
         )
-        response_lift = increased_response - current_response
+        saturation_lift = increased_response - current_response
         if current_response != 0.0:
-            response_lift_pct = response_lift / current_response
+            saturation_lift_pct = saturation_lift / current_response
         else:
             logger.warning(
-                "Response lift percentage could not be calculated for channel %r "
+                "Saturation lift percentage could not be calculated for channel %r "
                 "due to a zero baseline response.",
                 channel,
             )
-            response_lift_pct = np.nan
+            saturation_lift_pct = np.nan
 
         rows.append(
             {
@@ -108,8 +108,8 @@ def spend_response_report(
                 "increased_spend": increased_spend,
                 "current_response": current_response,
                 "increased_response": increased_response,
-                "response_lift": response_lift,
-                "response_lift_pct": response_lift_pct,
+                "saturation_lift": saturation_lift,
+                "saturation_lift_pct": saturation_lift_pct,
             }
         )
 
