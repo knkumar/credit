@@ -39,12 +39,14 @@ def get_sigma_val(fit: "MMMFit", kpi: str, target_ndim: int) -> float | np.ndarr
         sigma_val = fit.map_params[f"sigma_{kpi}"]
     elif fit.trace is not None and f"sigma_{kpi}" in fit.trace.posterior:
         sigma_samples = fit.trace.posterior[f"sigma_{kpi}"].values
-        sigma_val = sigma_samples.reshape(-1)
-        while sigma_val.ndim < target_ndim - 1:
-            sigma_val = np.expand_dims(sigma_val, axis=-1)
+        sigma_val = sigma_samples
     else:
         sigma_val = 0.0
-    return np.asarray(sigma_val)
+        
+    sigma_val = np.asarray(sigma_val).reshape(-1)
+    while sigma_val.ndim < target_ndim - 1:
+        sigma_val = np.expand_dims(sigma_val, axis=-1)
+    return sigma_val
 
 
 def _regression_metrics(
