@@ -111,6 +111,7 @@ class HierarchicalMMM:
             if (global_max == 0.0).any():
                 logger.warning("The dataset has zero media spend for one or more channels, indicating a likely data issue.")
             media_max = np.where(media_max == 0.0, global_max, media_max)
+            media_max = np.maximum(media_max, 1e-8)
             self._media_max = media_max[0, 0, :]  # [C] — per-channel panel max spend
         media_scaled = media_array / np.maximum(self._media_max, 1e-8)
 
