@@ -5,6 +5,13 @@ import pytensor
 import pytensor.tensor as pt
 
 
+# PyTensor (differentiable) counterparts of the NumPy reference implementations
+# in calmmm/transforms/adstock.py and calmmm/transforms/saturation.py.
+# The NumPy versions validate inputs (e.g. decay ∈ [0,1)) and omit the ε=1e-9
+# denominator guard; the PyTensor versions rely on priors for range enforcement
+# and add ε for numerical stability.
+
+
 def geometric_adstock_pt(X, decay):
     """
     Geometric adstock via pytensor.scan.
@@ -24,11 +31,12 @@ def geometric_adstock_pt(X, decay):
         return x_t + h_prev * decay_[None, :]
 
     h0 = pt.zeros_like(X[0])  # [G, C]
-    h_seq, _updates = pytensor.scan(
+    h_seq = pytensor.scan(
         _step,
         sequences=[X],
         outputs_info=[h0],
         non_sequences=[decay],
+        return_updates=False,
     )
     return h_seq  # [T, G, C]
 

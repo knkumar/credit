@@ -208,6 +208,7 @@ class MMMFit:
             priors=mmm.priors,
             n_fourier_pairs=mmm.n_fourier_pairs,
             holdout_fraction=0.0,
+            interaction_graph=mmm.interaction_graph,
         )
         full_model = full_mmm.build_model(mmm._data)
 

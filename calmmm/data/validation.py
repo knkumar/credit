@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from calmmm.data.containers import MMMData
 
 
 @dataclass
@@ -22,7 +26,7 @@ class ValidationResult:
         return self
 
 
-def validate_mmmdata(dataset) -> ValidationResult:
+def validate_mmmdata(dataset: MMMData) -> ValidationResult:
     result = ValidationResult()
     _check_duplicate_panel_rows(dataset, result)
     _check_negative_spend(dataset, result)
@@ -34,7 +38,7 @@ def validate_mmmdata(dataset) -> ValidationResult:
     return result
 
 
-def _check_duplicate_panel_rows(dataset, result: ValidationResult) -> None:
+def _check_duplicate_panel_rows(dataset: MMMData, result: ValidationResult) -> None:
     obs = dataset.observations
     dupes = obs.duplicated(subset=["time", "geo", "kpi"])
     if dupes.any():
@@ -44,7 +48,7 @@ def _check_duplicate_panel_rows(dataset, result: ValidationResult) -> None:
         )
 
 
-def _check_negative_spend(dataset, result: ValidationResult) -> None:
+def _check_negative_spend(dataset: MMMData, result: ValidationResult) -> None:
     neg = dataset.media["spend"] < 0
     if neg.any():
         channels = dataset.media.loc[neg, "channel"].unique().tolist()
@@ -53,7 +57,7 @@ def _check_negative_spend(dataset, result: ValidationResult) -> None:
         )
 
 
-def _check_missing_outcomes(dataset, result: ValidationResult) -> None:
+def _check_missing_outcomes(dataset: MMMData, result: ValidationResult) -> None:
     missing = int(dataset.observations["outcome"].isna().sum())
     if missing > 0:
         result.errors.append(
@@ -61,7 +65,7 @@ def _check_missing_outcomes(dataset, result: ValidationResult) -> None:
         )
 
 
-def _check_count_kpi_integrity(dataset, result: ValidationResult) -> None:
+def _check_count_kpi_integrity(dataset: MMMData, result: ValidationResult) -> None:
     count_likelihoods = {"negative_binomial", "binomial"}
     for _, row in dataset.kpi_metadata.iterrows():
         if row["likelihood"] in count_likelihoods:
@@ -78,7 +82,7 @@ def _check_count_kpi_integrity(dataset, result: ValidationResult) -> None:
                 )
 
 
-def _check_binomial_kpi_has_population(dataset, result: ValidationResult) -> None:
+def _check_binomial_kpi_has_population(dataset: MMMData, result: ValidationResult) -> None:
     binomial_kpis = dataset.kpi_metadata.loc[
         dataset.kpi_metadata["likelihood"] == "binomial", "kpi"
     ].tolist()
@@ -91,7 +95,7 @@ def _check_binomial_kpi_has_population(dataset, result: ValidationResult) -> Non
             )
 
 
-def _check_binomial_not_exceeds_population(dataset, result: ValidationResult) -> None:
+def _check_binomial_not_exceeds_population(dataset: MMMData, result: ValidationResult) -> None:
     binomial_kpis = dataset.kpi_metadata.loc[
         dataset.kpi_metadata["likelihood"] == "binomial", "kpi"
     ].tolist()
@@ -106,7 +110,7 @@ def _check_binomial_not_exceeds_population(dataset, result: ValidationResult) ->
             )
 
 
-def _check_weak_media_variation(dataset, result: ValidationResult) -> None:
+def _check_weak_media_variation(dataset: MMMData, result: ValidationResult) -> None:
     for channel in dataset.channels:
         spend = dataset.media.loc[dataset.media["channel"] == channel, "spend"]
         mean = spend.mean()
