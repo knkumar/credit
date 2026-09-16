@@ -438,14 +438,25 @@ Compares model-implied lift against observed lift tests in the KPI's original ou
 
 ![Calibration modeled vs observed lift](../reporting/calibration_fit.svg)
 
-### Fit quality and diagnostics tables
+### Fit quality
 
-The demo also writes non-visual diagnostic tables under `artifacts/demo_fit/`:
+Shows training-window RMSE and R2 per KPI from `fit_quality.csv`. R2 can be negative when the fitted mean is worse than using the KPI mean; the R2 chart renders negative bars extending left of a zero baseline instead of clipping them to zero, so a poor fit stays visible.
+
+![Training-window R2 by KPI](../reporting/fit_quality_r2.svg)
+![Training-window RMSE by KPI](../reporting/fit_quality_rmse.svg)
+
+### MCMC diagnostics
+
+Shows `r_hat` and effective sample size (`ess_bulk`/`ess_tail`) per parameter from `mcmc_diagnostics.csv`, only when the fit has posterior samples (`mode="sample"` or `mode="vi"`). The R-hat chart is skipped when every parameter's `r_hat` is `NaN` — this happens for single-chain runs (e.g. `mode="vi"`, or `mode="sample"` with `chains=1`), since R-hat needs at least two chains to compare. The ESS chart still renders in that case, since ESS is defined for a single chain.
+
+### Diagnostic tables and JSON
+
+The demo also writes non-visual diagnostic outputs under `artifacts/demo_fit/`:
 
 | File | Contents |
 |---|---|
-| `fit_quality.csv` | Training-window RMSE and R2 per KPI. R2 can be negative when the fitted mean is worse than using the KPI mean. |
-| `mcmc_diagnostics.csv` | `r_hat`, `ess_bulk`, and `ess_tail` for posterior parameters when the fit uses `mode="sample"` or `mode="vi"`. MAP fits write an empty table with the same columns because MAP has no posterior samples. |
+| `fit_quality.csv` | Training-window RMSE and R2 per KPI. See [Fit quality](#fit-quality) above for the rendered chart. |
+| `mcmc_diagnostics.csv` | `r_hat`, `ess_bulk`, and `ess_tail` for posterior parameters when the fit uses `mode="sample"` or `mode="vi"`. MAP fits write an empty table with the same columns because MAP has no posterior samples. See [MCMC diagnostics](#mcmc-diagnostics) above for the rendered chart. |
 | `fit_summary.json` → `interaction_gammas` | `{"gamma_<source>_<target>": value, ...}` for every edge in the demo's `interaction_graph` (see [Channel interactions](#3-channel-interactions-optional)). Empty `{}` when no interaction graph is fit. |
 
 The packaged demo treats `applications` as a Gaussian KPI because the sample series is smooth and aggregated. For sparse or highly overdispersed count outcomes, prefer `negative_binomial`.

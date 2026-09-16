@@ -94,6 +94,10 @@ def test_render_reporting_outputs_writes_visuals_and_summary(tmp_path):
         reporting_dir / "saturation_curves.svg",
         reporting_dir / "roi.svg",
         reporting_dir / "calibration_fit.svg",
+        reporting_dir / "fit_quality_r2.svg",
+        reporting_dir / "fit_quality_rmse.svg",
+        reporting_dir / "mcmc_rhat.svg",
+        reporting_dir / "mcmc_ess.svg",
     }
     assert set(outputs) == expected
     for path in expected:
@@ -137,3 +141,91 @@ def test_render_reporting_outputs_keeps_labels_and_ticks_readable(tmp_path):
     assert "$0" in saturation_svg
     assert "50%" in saturation_svg
     assert "0% = no response; 100% = fully saturated" in saturation_svg
+
+
+def test_render_fit_quality_handles_negative_r2(tmp_path):
+    reporting_dir = tmp_path / "reporting"
+    artifacts_dir = tmp_path / "artifacts"
+    reporting_dir.mkdir(parents=True)
+    artifacts_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "metric": ["rmse_applications", "r2_applications", "rmse_funded_revenue", "r2_funded_revenue"],
+            "kpi": ["applications", "applications", "funded_revenue", "funded_revenue"],
+            "window": ["train", "train", "train", "train"],
+            "value": [33.95, 0.956, 19427.87, -0.5],
+        }
+    ).to_csv(artifacts_dir / "fit_quality.csv", index=False)
+
+    outputs = render_reporting_outputs(reporting_dir=reporting_dir, artifacts_dir=artifacts_dir)
+
+    assert reporting_dir / "fit_quality_r2.svg" in outputs
+    assert reporting_dir / "fit_quality_rmse.svg" in outputs
+    r2_svg = (reporting_dir / "fit_quality_r2.svg").read_text()
+    assert "0.96" in r2_svg
+    assert "-0.50" in r2_svg
+    assert "funded_revenue" in r2_svg
+    rmse_svg = (reporting_dir / "fit_quality_rmse.svg").read_text()
+    assert "19,427.87" in rmse_svg
+
+
+def test_render_mcmc_diagnostics_skips_rhat_when_all_nan(tmp_path):
+    reporting_dir = tmp_path / "reporting"
+    artifacts_dir = tmp_path / "artifacts"
+    reporting_dir.mkdir(parents=True)
+    artifacts_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "parameter": ["adstock_decay[search]", "hill_alpha[search]"],
+            "r_hat": [None, None],
+            "ess_bulk": [184.0, 181.0],
+            "ess_tail": [229.0, 184.0],
+        }
+    ).to_csv(artifacts_dir / "mcmc_diagnostics.csv", index=False)
+
+    outputs = render_reporting_outputs(reporting_dir=reporting_dir, artifacts_dir=artifacts_dir)
+
+    assert reporting_dir / "mcmc_ess.svg" in outputs
+    assert (reporting_dir / "mcmc_ess.svg").exists()
+    assert reporting_dir / "mcmc_rhat.svg" not in outputs
+    assert not (reporting_dir / "mcmc_rhat.svg").exists()
+    ess_svg = (reporting_dir / "mcmc_ess.svg").read_text()
+    assert "adstock_decay[search]" in ess_svg
+
+
+def test_render_mcmc_diagnostics_renders_rhat_when_present(tmp_path):
+    reporting_dir = tmp_path / "reporting"
+    artifacts_dir = tmp_path / "artifacts"
+    reporting_dir.mkdir(parents=True)
+    artifacts_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "parameter": ["adstock_decay[search]", "hill_alpha[search]"],
+            "r_hat": [1.15, 1.0],
+            "ess_bulk": [184.0, 900.0],
+            "ess_tail": [229.0, 950.0],
+        }
+    ).to_csv(artifacts_dir / "mcmc_diagnostics.csv", index=False)
+
+    outputs = render_reporting_outputs(reporting_dir=reporting_dir, artifacts_dir=artifacts_dir)
+
+    assert reporting_dir / "mcmc_rhat.svg" in outputs
+    rhat_svg = (reporting_dir / "mcmc_rhat.svg").read_text()
+    assert "adstock_decay[search]" in rhat_svg
+    assert "1.01 threshold" in rhat_svg
+
+
+def test_render_reporting_outputs_skips_empty_mcmc_diagnostics(tmp_path):
+    reporting_dir = tmp_path / "reporting"
+    artifacts_dir = tmp_path / "artifacts"
+    reporting_dir.mkdir(parents=True)
+    artifacts_dir.mkdir(parents=True)
+    pd.DataFrame(columns=["parameter", "r_hat", "ess_bulk", "ess_tail"]).to_csv(
+        artifacts_dir / "mcmc_diagnostics.csv", index=False
+    )
+
+    outputs = render_reporting_outputs(reporting_dir=reporting_dir, artifacts_dir=artifacts_dir)
+
+    assert not any("mcmc" in path.name for path in outputs)
+    assert not (reporting_dir / "mcmc_rhat.svg").exists()
+    assert not (reporting_dir / "mcmc_ess.svg").exists()

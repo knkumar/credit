@@ -60,12 +60,16 @@ print(roi)
 
 ## Reporting Preview
 
-`calmmm` can render report-ready SVGs from demo or production fit outputs. The generated charts keep the model artifacts auditable while giving stakeholders a quick read on response curves, ROI, calibration fit, and spend scenarios.
-The same demo output includes `fit_quality.csv` with RMSE/R2 and `mcmc_diagnostics.csv` with R-hat/ESS diagnostics for posterior fits.
+`calmmm` can render report-ready SVGs from demo or production fit outputs. The generated charts keep the model artifacts auditable while giving stakeholders a quick read on response curves, ROI, calibration fit, fit quality, and spend scenarios.
+The same demo output includes `fit_quality.csv` with RMSE/R2 and `mcmc_diagnostics.csv` with R-hat/ESS diagnostics for posterior fits. `mcmc_diagnostics.csv` is only rendered when the fit has posterior samples (`mode="sample"` or `mode="vi"`); MAP fits skip it since there is nothing to diagnose.
 
 | Saturation curves | ROI by KPI and channel |
 |---|---|
 | ![Fitted saturation curves showing media response index by spend level](reporting/saturation_curves.svg) | ![ROI by KPI and channel](reporting/roi.svg) |
+
+| R2 by KPI | RMSE by KPI |
+|---|---|
+| ![Training-window R2 by KPI](reporting/fit_quality_r2.svg) | ![Training-window RMSE by KPI](reporting/fit_quality_rmse.svg) |
 
 See the [User Guide](docs/user_guide.md#7-reporting-visuals) for the full reporting workflow and additional plots.
 
