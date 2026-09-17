@@ -67,6 +67,10 @@ The same demo output includes `fit_quality.csv` with RMSE/R2 and `mcmc_diagnosti
 |---|---|
 | ![Fitted saturation curves showing media response index by spend level](reporting/saturation_curves.svg) | ![ROI by KPI and channel](reporting/roi.svg) |
 
+| Calibration: modeled vs observed lift | Spend scenario response by channel |
+|---|---|
+| ![Calibration modeled vs observed lift](reporting/calibration_fit.svg) | ![Spend scenario response by channel](reporting/spend_response.svg) |
+
 | R2 by KPI | RMSE by KPI |
 |---|---|
 | ![Training-window R2 by KPI](reporting/fit_quality_r2.svg) | ![Training-window RMSE by KPI](reporting/fit_quality_rmse.svg) |

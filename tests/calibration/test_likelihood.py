@@ -66,3 +66,25 @@ def test_add_calibration_likelihood_unsupported_estimand_raises(lift_tests, mmmd
     with model:
         with pytest.raises(NotImplementedError, match="immediate"):
             add_calibration_likelihood(model, [target])
+
+
+def test_add_calibration_likelihood_unsupported_likelihood_raises(lift_tests, mmmdata):
+    """CalibrationTargets with an unsupported calibration_likelihood must raise NotImplementedError."""
+    from calmmm.calibration.targets import CalibrationTarget
+    target = CalibrationTarget(
+        test_id="exp_lognormal",
+        t_indices=np.array([0, 1]),
+        g_indices=np.array([0]),
+        c_indices=np.array([0]),
+        k_index=0,
+        lift_obs=1000.0,
+        se=200.0,
+        calibration_likelihood="lognormal",  # not supported: only "normal", "student_t"
+        estimand="total",
+    )
+    mmm = HierarchicalMMM(holdout_fraction=0.0)
+    model = mmm.build_model(mmmdata)
+
+    with model:
+        with pytest.raises(NotImplementedError, match="lognormal"):
+            add_calibration_likelihood(model, [target])
