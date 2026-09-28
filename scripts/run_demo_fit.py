@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from calmmm import MMMData, IncrementalityTests, HierarchicalMMM
@@ -238,11 +239,17 @@ def write_outputs(
     curves.to_csv(args.reporting_dir / "saturation_curves.csv", index=False)
     response_report.to_csv(args.reporting_dir / "spend_response.csv", index=False)
 
-    interaction_gammas = {
-        name: float(value)
-        for name, value in (fit.map_params or {}).items()
-        if name.startswith("gamma_") and not name.endswith("_log__")
-    } if fit.map_params is not None else {}
+    interaction_gammas = {}
+    if fit.map_params is not None:
+        for name, value in fit.map_params.items():
+            if not name.startswith("gamma_") or name.endswith("_log__"):
+                continue
+            value_array = np.asarray(value, dtype=float)
+            interaction_gammas[name] = (
+                float(value_array)
+                if value_array.ndim == 0
+                else value_array.tolist()
+            )
 
     summary = {
         "mode": args.mode,

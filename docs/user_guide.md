@@ -458,7 +458,7 @@ The demo also writes non-visual diagnostic outputs under `artifacts/demo_fit/`:
 |---|---|
 | `fit_quality.csv` | Training-window RMSE and R2 per KPI. See [Fit quality](#fit-quality) above for the rendered chart. |
 | `mcmc_diagnostics.csv` | `r_hat`, `ess_bulk`, and `ess_tail` for posterior parameters when the fit uses `mode="sample"` or `mode="vi"`. MAP fits write an empty table with the same columns because MAP has no posterior samples. See [MCMC diagnostics](#mcmc-diagnostics) above for the rendered chart. |
-| `fit_summary.json` → `interaction_gammas` | `{"gamma_<source>_<target>": value, ...}` for every edge in the demo's `interaction_graph` (see [Channel interactions](#3-channel-interactions-optional)). Empty `{}` when no interaction graph is fit. |
+| `fit_summary.json` → `interaction_gammas` | One entry per edge in the demo's `interaction_graph` (see [Channel interactions](#3-channel-interactions-optional)): `{"gamma_<source>_<target>": value, ...}`. A scalar value is a number; values per KPI are a list. Empty `{}` when no interaction graph is fit. |
 
 The packaged demo treats `applications` as a Gaussian KPI because the sample series is smooth and aggregated. For sparse or highly overdispersed count outcomes, prefer `negative_binomial`.
 

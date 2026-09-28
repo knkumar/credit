@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
 import pandas as pd
 
 from calmmm.attribution.curves import spend_response_report
@@ -216,7 +217,7 @@ def test_write_outputs_persists_interaction_gammas(tmp_path, monkeypatch):
         calibration_targets=[],
         map_params={
             "mu": 1,
-            "gamma_direct_mail_search": 0.00241,
+            "gamma_direct_mail_search": np.array([0.00241, 0.00312]),
             "gamma_direct_mail_search_log__": -6.027888852353258,
         },
         fit_metrics=lambda: {"rmse_applications": 12.0, "r2_applications": 0.82},
@@ -252,4 +253,6 @@ def test_write_outputs_persists_interaction_gammas(tmp_path, monkeypatch):
     script.write_outputs(args=args, panel=panel, lift_tests=lift_tests, fit=fit)
 
     summary = json.loads((output_dir / "fit_summary.json").read_text())
-    assert summary["interaction_gammas"] == {"gamma_direct_mail_search": 0.00241}
+    assert summary["interaction_gammas"] == {
+        "gamma_direct_mail_search": [0.00241, 0.00312]
+    }
