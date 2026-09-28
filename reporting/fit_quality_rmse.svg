@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
+<rect width="100%" height="100%" fill="#ffffff" />
+<text x="24.0" y="38.0" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#111111" text-anchor="start">Fit quality: RMSE by KPI</text>
+<text x="24.0" y="64.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111" text-anchor="start">Training-window RMSE in each KPI's original outcome units.</text>
+<text x="280.0" y="94.0" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#111111" text-anchor="start">RMSE (KPI units)</text>
+<text x="24.0" y="237.4" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111" text-anchor="start">applications</text>
+<rect x="280" y="112.0" width="1.1" height="193.0" fill="#ff6b35" />
+<text x="289.1" y="237.4" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111" text-anchor="start">33.95</text>
+<text x="24.0" y="444.4" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#111111" text-anchor="start">funded_revenue</text>
+<rect x="280" y="319.0" width="643.5" height="193.0" fill="#ff6b35" />
+<text x="931.5" y="444.4" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#111111" text-anchor="start">19,427.87</text>
+</svg>
