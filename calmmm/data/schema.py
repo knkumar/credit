@@ -81,6 +81,18 @@ class ExperimentRow:
 
     def __post_init__(self) -> None:
         import math
+
+        self.channel_bundle = _normalize_experiment_dimension(
+            self.channel_bundle,
+            field_name="channel_bundle",
+            allow_empty=False,
+        )
+        self.geo_scope = _normalize_experiment_dimension(
+            self.geo_scope,
+            field_name="geo_scope",
+            allow_empty=True,
+        )
+
         if math.isnan(self.lift) or math.isinf(self.lift):
             raise ValueError("lift must be a finite number")
 
@@ -123,3 +135,35 @@ class ExperimentRow:
             and self.estimand == other.estimand
             and self.ci_level == other.ci_level
         )
+
+
+def _normalize_experiment_dimension(
+    values: list[str],
+    *,
+    field_name: str,
+    allow_empty: bool,
+) -> list[str]:
+    if not isinstance(values, list):
+        raise ValueError(f"{field_name} must be a list of strings")
+    if not values and not allow_empty:
+        raise ValueError(f"{field_name} must contain at least one value")
+
+    normalized = []
+    for value in values:
+        if not isinstance(value, str):
+            raise ValueError(f"{field_name} must contain only strings")
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError(f"{field_name} contains an empty value")
+        normalized.append(stripped)
+
+    seen = set()
+    duplicates = []
+    for value in normalized:
+        if value in seen and value not in duplicates:
+            duplicates.append(value)
+        seen.add(value)
+    if duplicates:
+        raise ValueError(f"{field_name} contains duplicate values: {duplicates}")
+
+    return normalized

@@ -52,6 +52,61 @@ def test_binomial_kpi_without_population_errors(synthetic_panel):
     assert any("binomial likelihood but missing population" in e for e in result.errors)
 
 
+def _binomial_dataset(panel):
+    return MMMData.from_dataframe(
+        panel,
+        time="week",
+        geo="dma",
+        kpis=["visits"],
+        media=["search"],
+        spend=["search_spend"],
+        population="population",
+        kpi_likelihoods={"visits": "binomial"},
+    )
+
+
+@pytest.mark.parametrize(
+    ("population", "message"),
+    [
+        (1_000_000.5, "whole numbers"),
+        (np.inf, "finite numbers"),
+        (-1.0, "non-negative"),
+        (float(2**63), "int64 range"),
+    ],
+)
+def test_binomial_population_rejects_invalid_values(
+    synthetic_panel,
+    population,
+    message,
+):
+    bad = synthetic_panel.copy()
+    bad["population"] = bad["population"].astype(float)
+    bad.loc[0, "population"] = population
+
+    result = validate_mmmdata(_binomial_dataset(bad))
+
+    assert result.has_errors
+    assert any(message in error for error in result.errors)
+
+
+def test_binomial_population_accepts_nonnegative_whole_values(synthetic_panel):
+    valid = synthetic_panel.copy()
+    valid["population"] = valid["population"].astype(float)
+
+    result = validate_mmmdata(_binomial_dataset(valid))
+
+    assert not result.has_errors
+
+
+def test_binomial_population_accepts_int64_max(synthetic_panel):
+    valid = synthetic_panel.copy()
+    valid.loc[0, "population"] = np.iinfo(np.int64).max
+
+    result = validate_mmmdata(_binomial_dataset(valid))
+
+    assert not result.has_errors
+
+
 def test_weak_media_variation_warns(synthetic_panel):
     flat = synthetic_panel.copy()
     flat["search_spend"] = 1000.0

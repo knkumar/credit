@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
+import numpy as np
 import pandas as pd
 from typing import TYPE_CHECKING
 
@@ -40,6 +41,7 @@ def validate_mmmdata(dataset: MMMData) -> ValidationResult:
     _check_lognormal_kpi_integrity(dataset, result)
     _check_gaussian_kpi_integrity(dataset, result)
     _check_binomial_kpi_has_population(dataset, result)
+    _check_binomial_population_integrity(dataset, result)
     _check_binomial_not_exceeds_population(dataset, result)
     _check_weak_media_variation(dataset, result)
     _check_temporal_continuity(dataset, result)
@@ -235,6 +237,49 @@ def _check_binomial_kpi_has_population(dataset: MMMData, result: ValidationResul
             )
 
 
+def _check_binomial_population_integrity(dataset: MMMData, result: ValidationResult) -> None:
+    binomial_kpis = dataset.kpi_metadata.loc[
+        dataset.kpi_metadata["likelihood"] == "binomial", "kpi"
+    ].tolist()
+    int64_upper_bound = 1 << 63
+    for kpi in binomial_kpis:
+        raw_population = dataset.observations.loc[
+            dataset.observations["kpi"] == kpi, "population"
+        ].dropna()
+        population = pd.to_numeric(raw_population, errors="coerce")
+        finite_mask = population.notna() & np.isfinite(population)
+        if (~finite_mask).any():
+            result.errors.append(
+                f"KPI '{kpi}' uses binomial likelihood but "
+                f"{int((~finite_mask).sum())} population value(s) are not finite numbers."
+            )
+
+        finite_population = population[finite_mask]
+        negative_mask = finite_population < 0
+        if negative_mask.any():
+            result.errors.append(
+                f"KPI '{kpi}' uses binomial likelihood but "
+                f"{int(negative_mask.sum())} population value(s) are negative. "
+                "Binomial population requires non-negative values."
+            )
+
+        fractional_mask = finite_population % 1 != 0
+        if fractional_mask.any():
+            result.errors.append(
+                f"KPI '{kpi}' uses binomial likelihood but "
+                f"{int(fractional_mask.sum())} population value(s) are not whole numbers."
+            )
+
+        # Float comparisons round int64 max up to 2**63, so use the exclusive
+        # upper bound to reject that value in both integer and float columns.
+        overflow_mask = finite_population >= int64_upper_bound
+        if overflow_mask.any():
+            result.errors.append(
+                f"KPI '{kpi}' uses binomial likelihood but "
+                f"{int(overflow_mask.sum())} population value(s) exceed the int64 range."
+            )
+
+
 def _check_binomial_not_exceeds_population(dataset: MMMData, result: ValidationResult) -> None:
     binomial_kpis = dataset.kpi_metadata.loc[
         dataset.kpi_metadata["likelihood"] == "binomial", "kpi"
@@ -242,7 +287,10 @@ def _check_binomial_not_exceeds_population(dataset: MMMData, result: ValidationR
     for kpi in binomial_kpis:
         kpi_obs = dataset.observations[dataset.observations["kpi"] == kpi]
         valid = kpi_obs[kpi_obs["population"].notna() & kpi_obs["outcome"].notna()]
-        bad = valid[valid["outcome"] > valid["population"]]
+        outcomes = pd.to_numeric(valid["outcome"], errors="coerce")
+        populations = pd.to_numeric(valid["population"], errors="coerce")
+        comparable = np.isfinite(outcomes) & np.isfinite(populations)
+        bad = valid[comparable & (outcomes > populations)]
         if not bad.empty:
             result.errors.append(
                 f"KPI '{kpi}' (binomial): {len(bad)} row(s) where "

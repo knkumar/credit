@@ -75,6 +75,48 @@ def test_experiment_row_se_provided_directly():
     assert row.se == 100.0
 
 
+@pytest.mark.parametrize(
+    ("field", "values"),
+    [
+        ("channel_bundle", ["search", "   "]),
+        ("channel_bundle", ["search", " search "]),
+        ("geo_scope", ["DMA_1", "   "]),
+        ("geo_scope", ["DMA_1", " DMA_1 "]),
+    ],
+)
+def test_experiment_row_rejects_empty_or_duplicate_dimensions(field, values):
+    kwargs = {
+        "test_id": "bad_dimensions",
+        "channel_bundle": ["search"],
+        "kpi": "visits",
+        "geo_scope": ["DMA_1"],
+        "start_date": pd.Timestamp("2024-03-01"),
+        "end_date": pd.Timestamp("2024-03-28"),
+        "lift": 100.0,
+        "se": 10.0,
+    }
+    kwargs[field] = values
+
+    with pytest.raises(ValueError, match="empty|duplicate"):
+        ExperimentRow(**kwargs)
+
+
+def test_experiment_row_strips_dimension_values():
+    row = ExperimentRow(
+        test_id="normalized_dimensions",
+        channel_bundle=[" search "],
+        kpi="visits",
+        geo_scope=[" DMA_1 "],
+        start_date=pd.Timestamp("2024-03-01"),
+        end_date=pd.Timestamp("2024-03-28"),
+        lift=100.0,
+        se=10.0,
+    )
+
+    assert row.channel_bundle == ["search"]
+    assert row.geo_scope == ["DMA_1"]
+
+
 def test_kpi_likelihood_enum_values():
     assert KPILikelihood.GAUSSIAN == "gaussian"
     assert KPILikelihood.NEGATIVE_BINOMIAL == "negative_binomial"
@@ -249,6 +291,36 @@ def test_incrementality_tests_happy_path(synthetic_panel, synthetic_lift_df):
     assert len(experiments) == 1
     assert experiments[0].test_id == "search_holdout_q1"
     assert experiments[0].se == 2_500.0
+
+
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [
+        ("channel", "search, "),
+        ("channel", "search, search"),
+        ("geo_scope", "DMA_1, "),
+        ("geo_scope", "DMA_1, DMA_1"),
+    ],
+)
+def test_incrementality_tests_reject_empty_or_duplicate_csv_dimensions(
+    synthetic_lift_df,
+    column,
+    value,
+):
+    bad = synthetic_lift_df.copy()
+    bad.loc[0, column] = value
+
+    with pytest.raises(ValueError, match="empty|duplicate"):
+        IncrementalityTests.from_dataframe(
+            bad,
+            channel="channel",
+            kpi="kpi",
+            geo_scope="geo_scope",
+            start="start_date",
+            end="end_date",
+            lift="incremental_outcome",
+            standard_error="se",
+        )
 
 
 def test_incrementality_tests_calibration_likelihood_literal_applies_to_all_rows(
