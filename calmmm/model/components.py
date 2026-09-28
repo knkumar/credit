@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 import numpy as np
+import pandas as pd
 import pymc as pm
 import pytensor.tensor as pt
 
@@ -10,10 +11,10 @@ from calmmm.model.priors import PriorConfig
 
 
 def _build_baseline(
-    fourier_matrix: np.ndarray,
+    fourier_matrix: np.ndarray | pt.TensorVariable,
     obs_mean_log: np.ndarray,
     priors: PriorConfig,
-    ctrl_array: np.ndarray | None = None,
+    ctrl_array: np.ndarray | pt.TensorVariable | None = None,
 ) -> pt.TensorVariable:
     """
     Baseline = per-(KPI, geo) intercept + Fourier seasonality + optional controls.
@@ -52,7 +53,7 @@ def _build_baseline(
     fourier_contrib = pt.dot(fourier_matrix, fourier_beta.T)[:, None, :]
     baseline = intercept_tgk + fourier_contrib  # [T, G, K]
 
-    if ctrl_array is not None and ctrl_array.shape[-1] > 0:
+    if ctrl_array is not None:
         beta_control = pm.Normal(
             "beta_control",
             mu=0.0,
@@ -144,11 +145,19 @@ def _build_media_hierarchy(
     return channel_contrib_tgkc.sum(axis=-1)  # [T, G, K]
 
 
+def _prepare_discrete_observed(y_obs: np.ndarray | pt.TensorVariable) -> np.ndarray | pt.TensorVariable:
+    if isinstance(y_obs, pt.TensorVariable):
+        return pt.cast(y_obs, "int64")
+    return np.ma.array(
+        np.nan_to_num(y_obs, nan=-1).astype("int64"), mask=np.ma.getmask(y_obs)  # purely a defensive safety net
+    )
+
+
 def _add_likelihood(
     mu: pt.TensorVariable,
-    obs_array: np.ndarray,
-    pop_array: np.ndarray,
-    kpi_metadata,
+    obs_array: np.ndarray | pt.TensorVariable,
+    pop_array: np.ndarray | pt.TensorVariable,
+    kpi_metadata: pd.DataFrame,
     kpis: list[str],
     priors: PriorConfig,
 ) -> None:
@@ -171,6 +180,8 @@ def _add_likelihood(
         row = kpi_metadata.loc[kpi_metadata["kpi"] == kpi]
         likelihood = row["likelihood"].values[0]
         y_obs = obs_array[:, :, k]
+        if isinstance(y_obs, np.ndarray):
+            y_obs = np.ma.masked_invalid(y_obs)
         mu_k = mu[:, :, k]
 
         if likelihood == "gaussian":
@@ -183,25 +194,22 @@ def _add_likelihood(
 
         elif likelihood == "negative_binomial":
             alpha_k = pm.HalfNormal(f"nb_alpha_{kpi}", sigma=priors.nb_alpha_sigma)
+            y_obs_discrete = _prepare_discrete_observed(y_obs)
             pm.NegativeBinomial(
                 f"obs_{kpi}",
                 mu=pm.math.exp(mu_k),
                 alpha=alpha_k,
-                observed=y_obs,
+                observed=y_obs_discrete,
             )
 
         elif likelihood == "binomial":
             n_pop = pop_array[:, :, k]
-            if np.any(np.isnan(n_pop)):
-                raise ValueError(
-                    f"KPI '{kpi}' has likelihood='binomial' but population is NaN. "
-                    "Provide a population column in MMMData."
-                )
+            y_obs_discrete = _prepare_discrete_observed(y_obs)
             pm.Binomial(
                 f"obs_{kpi}",
-                n=n_pop.astype(int),
+                n=pt.cast(n_pop, "int64"),
                 p=pm.math.sigmoid(mu_k),
-                observed=y_obs,
+                observed=y_obs_discrete,
             )
 
         else:

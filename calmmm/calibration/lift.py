@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from calmmm.model.fit import eval_mu_and_channel_contrib as _eval_mu_and_channel_contrib
+from calmmm.model.fit import get_sigma_val
 
 if TYPE_CHECKING:
     from calmmm.calibration.targets import CalibrationTarget
@@ -46,6 +47,7 @@ def compute_model_lift(
         return pd.DataFrame(columns=["test_id", "lift_model", "lift_obs", "se", "z_score"])
 
     mu_val, cc_val = _eval_mu_and_channel_contrib(fit)
+    is_mcmc = mu_val.ndim > 3
 
     rows = []
     for target in targets:
@@ -54,10 +56,27 @@ def compute_model_lift(
         k = target.k_index
         c = target.c_indices
 
-        mu_exp = mu_val[t][:, g, k]                              # [T_exp, G_exp]
-        cc_total = cc_val[t][:, g, k, :][:, :, c].sum(axis=-1)  # [T_exp, G_exp]
+        if is_mcmc:
+            mu_exp = mu_val[:, t][..., g, k]
+            cc_total = cc_val[:, t][..., g, k, :][..., c].sum(axis=-1)
+        else:
+            mu_exp = mu_val[t][:, g, k]
+            cc_total = cc_val[t][:, g, k, :][:, :, c].sum(axis=-1)
 
-        lift_model = float((np.exp(mu_exp) - np.exp(mu_exp - cc_total)).sum())
+        kpi_name = fit.data.kpis[k]
+        likelihood = fit.data.kpi_metadata.loc[fit.data.kpi_metadata["kpi"] == kpi_name, "likelihood"].values[0]
+
+        if likelihood == "binomial":
+            from scipy.special import expit
+            pop_exp = fit._mmm._pop_array[fit._mmm._train_mask][t][:, g, k]
+            lifts = (expit(mu_exp) * pop_exp - expit(mu_exp - cc_total) * pop_exp).sum(axis=(-2, -1) if is_mcmc else None)
+        elif likelihood == "lognormal":
+            sigma_val = get_sigma_val(fit, kpi_name, mu_val.ndim)
+            lifts = (np.exp(mu_exp + sigma_val**2 / 2.0) - np.exp(mu_exp - cc_total + sigma_val**2 / 2.0)).sum(axis=(-2, -1) if is_mcmc else None)
+        else:
+            lifts = (np.exp(mu_exp) - np.exp(mu_exp - cc_total)).sum(axis=(-2, -1) if is_mcmc else None)
+            
+        lift_model = float(lifts.mean() if is_mcmc else lifts)
         z_score = (lift_model - target.lift_obs) / target.se
 
         rows.append({

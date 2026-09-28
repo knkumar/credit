@@ -3,6 +3,10 @@ from __future__ import annotations
 import numpy as np
 
 
+# Pure-NumPy reference implementation. The differentiable PyTensor version
+# used inside the PyMC model is in calmmm/model/transforms.py.
+
+
 def hill_saturation(x: np.ndarray, alpha: float, K: float) -> np.ndarray:
     """
     Hill (power) saturation curve.
@@ -35,7 +39,11 @@ def ispline_basis(x: np.ndarray, n_knots: int = 4, degree: int = 3) -> np.ndarra
     n_knots: number of interior knots placed at equally-spaced quantiles of x
     degree: B-spline degree (3 = cubic)
 
-    Returns array of shape (len(x), n_basis) where n_basis = n_knots + degree - 1.
+    Returns array of shape (len(x), n_basis) where n_basis = n_knots + degree + 1.
+
+    Note: This function is not currently used by the model (which uses the
+    parametric Hill curve). It is provided for future non-parametric saturation
+    curve experiments.
     """
     from scipy.interpolate import BSpline  # lazy import — scipy is optional at module load time
 
@@ -49,16 +57,16 @@ def ispline_basis(x: np.ndarray, n_knots: int = 4, degree: int = 3) -> np.ndarra
     interior_knots = np.percentile(x, quantiles)
 
     t = np.concatenate([
-        np.full(degree, x_min),
+        np.full(degree + 1, x_min),
         interior_knots,
-        np.full(degree, x_max),
+        np.full(degree + 1, x_max),
     ])
 
     n_basis = len(t) - degree - 1
     B = np.zeros((len(x), n_basis))
 
     # Dense grid for numerical integration
-    x_dense = np.linspace(x_min, x_max, max(500, len(x) * 5))
+    x_dense = np.linspace(x_min, x_max, min(max(500, len(x) * 5), 10000))
     dx = x_dense[1] - x_dense[0]
 
     for i in range(n_basis):

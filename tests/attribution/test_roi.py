@@ -51,3 +51,48 @@ def test_compute_roi_raises_without_mmm():
     fit = MMMFit(trace=None, map_params={}, model=pm.Model(), data=None, _mmm=None)
     with pytest.raises(ValueError, match="_mmm is None"):
         compute_roi(fit)
+
+
+def test_compute_roi_zero_spend_returns_nan():
+    """When a channel has zero spend, ROI should be NaN, not inf."""
+    import numpy as np
+    import pandas as pd
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    # Fake marginal_contributions returning a channel with contribution but zero spend
+    fake_contribs = pd.DataFrame({
+        "time": [pd.Timestamp("2024-01-01")] * 2,
+        "geo": ["A", "A"],
+        "kpi": ["visits", "visits"],
+        "channel": ["search", "zero_ch"],
+        "contribution": [100.0, 50.0],
+    })
+    fake_media = pd.DataFrame({
+        "time": [pd.Timestamp("2024-01-01")] * 2,
+        "geo": ["A", "A"],
+        "channel": ["search", "zero_ch"],
+        "spend": [1000.0, 0.0],
+    })
+    mock_mmm = SimpleNamespace(
+        _train_mask=np.array([True]),
+    )
+    mock_data = SimpleNamespace(
+        times=[pd.Timestamp("2024-01-01")],
+        media=fake_media,
+    )
+    fit = SimpleNamespace(
+        _mmm=mock_mmm,
+        data=mock_data,
+    )
+
+    with patch("calmmm.attribution.roi.marginal_contributions", return_value=fake_contribs):
+        from calmmm.attribution.roi import compute_roi
+        result = compute_roi(fit)
+
+    zero_row = result[result["channel"] == "zero_ch"]
+    assert zero_row["total_spend"].values[0] == 0.0
+    assert np.isnan(zero_row["roi"].values[0]), "ROI should be NaN when spend is zero"
+    # Non-zero channel should have a finite ROI
+    search_row = result[result["channel"] == "search"]
+    assert np.isfinite(search_row["roi"].values[0])

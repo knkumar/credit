@@ -3,6 +3,10 @@ from __future__ import annotations
 import numpy as np
 
 
+# Pure-NumPy reference implementation. The differentiable PyTensor version
+# used inside the PyMC model is in calmmm/model/transforms.py.
+
+
 def geometric_adstock(x: np.ndarray, decay: float) -> np.ndarray:
     """
     Recursive geometric adstock: x_out[t] = x[t] + decay * x_out[t-1].
@@ -39,7 +43,19 @@ def weibull_adstock(
     shape: Weibull shape parameter (k), must be > 0
     scale: Weibull scale parameter (lambda), must be > 0
     n_lags: number of lag periods (default 13 = one quarter at weekly frequency)
+
+    Note: This function is not currently used by the model (which uses
+    geometric adstock via ``geometric_adstock_pt``). It is provided for
+    experimentation with alternative adstock kernels. There is no PyTensor
+    counterpart; one would need to be written before using Weibull adstock
+    in the PyMC model.
     """
+    import warnings
+    warnings.warn(
+        "weibull_adstock lacks a PyTensor counterpart and is currently considered an experimental/reference feature.",
+        UserWarning,
+        stacklevel=2,
+    )
     if shape <= 0:
         raise ValueError(f"shape must be > 0, got {shape}")
     if scale <= 0:
@@ -48,10 +64,15 @@ def weibull_adstock(
     from scipy.stats import weibull_min  # lazy import — scipy is optional at module load time
 
     x = np.asarray(x, dtype=float)
-    lags = np.arange(1, n_lags + 1, dtype=float)
+    lags = np.arange(0, n_lags, dtype=float) + 1e-5
     weights = weibull_min.pdf(lags, c=shape, scale=scale)
     total = weights.sum()
     weights = weights / total if total > 0 else np.ones(n_lags) / n_lags
 
+    import scipy.signal
+    # Reshape weights for convolution over multi-dimensional x
+    # Time is assumed to be the 0-th dimension
+    weights_nd = weights.reshape((n_lags,) + (1,) * (x.ndim - 1))
+
     # Causal convolution: out[t] = sum_{l=0}^{n_lags-1} weights[l] * x[t - l]
-    return np.convolve(x, weights, mode="full")[: len(x)]
+    return scipy.signal.convolve(x, weights_nd, mode="full")[: len(x)]

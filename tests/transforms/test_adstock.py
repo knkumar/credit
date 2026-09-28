@@ -58,3 +58,10 @@ def test_weibull_adstock_invalid_shape_raises():
 def test_weibull_adstock_invalid_scale_raises():
     with pytest.raises(ValueError, match="scale must be > 0"):
         weibull_adstock(np.ones(5), shape=1.0, scale=0.0)
+
+
+def test_weibull_adstock_multi_dimensional():
+    T, G, C = 10, 3, 2
+    x = np.random.default_rng(0).uniform(0, 1, (T, G, C))
+    result = weibull_adstock(x, shape=1.5, scale=3.0, n_lags=4)
+    assert result.shape == (T, G, C)

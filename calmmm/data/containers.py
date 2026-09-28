@@ -39,7 +39,7 @@ class MMMData:
 
     @functools.cached_property
     def kpis(self) -> list[str]:
-        return sorted(self.observations["kpi"].unique().tolist())
+        return self.observations["kpi"].unique().tolist()
 
     @functools.cached_property
     def geos(self) -> list[str]:
@@ -86,6 +86,14 @@ class MMMData:
 
         df = df.copy()
         df[time] = pd.to_datetime(df[time])
+        if df[time].isna().any():
+            raise ValueError(f"Missing or unparseable dates found in column '{time}'")
+        
+        if df.duplicated(subset=[time, geo]).any():
+            raise ValueError("Duplicate (time, geo) combinations found in observations data.")
+
+        if population is not None and df[population].isna().any():
+            raise ValueError(f"Population column '{population}' contains missing values. Please ensure all rows have a valid population size.")
 
         # Build observations: long format (one row per time x geo x kpi)
         # column order: time, geo, kpi, outcome, population
@@ -164,6 +172,11 @@ class IncrementalityTests:
     def __iter__(self):
         return iter(self._experiments)
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, IncrementalityTests):
+            return NotImplemented
+        return self._experiments == other._experiments
+
     @classmethod
     def from_dataframe(
         cls,
@@ -185,17 +198,46 @@ class IncrementalityTests:
     ) -> "IncrementalityTests":
         def _per_row(value, row, cast):
             """If `value` names a column in `df`, read it per-row; otherwise use it as a literal for every row."""
-            if isinstance(value, str) and value in df.columns:
-                return cast(row[value])
-            return value
+            if isinstance(value, str):
+                if value in df.columns:
+                    return cast(row[value])
+                try:
+                    return cast(value)
+                except ValueError:
+                    pass
+            return cast(value)
+
+        required_cols = [channel, kpi, geo_scope, start, end, lift]
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            raise KeyError(f"Missing required columns in DataFrame: {missing_cols}")
 
         experiments = []
-        for i, row in df.iterrows():
-            se = float(row[standard_error]) if standard_error and standard_error in df.columns else None
-            ci_lo = float(row[ci_lower]) if ci_lower and ci_lower in df.columns else None
-            ci_hi = float(row[ci_upper]) if ci_upper and ci_upper in df.columns else None
+        seen_ids = set()
+        for i, (_, row) in enumerate(df.iterrows()):
+            def _parse_numeric(col_name):
+                if not col_name:
+                    return None
+                if col_name in df.columns:
+                    val = pd.to_numeric(row[col_name], errors="coerce")
+                    return None if pd.isna(val) else float(val)
+                try:
+                    return float(col_name)
+                except (ValueError, TypeError):
+                    return None
+
+            se = _parse_numeric(standard_error)
+            ci_lo = _parse_numeric(ci_lower)
+            ci_hi = _parse_numeric(ci_upper)
+
+            test_id = str(row["test_id"]) if "test_id" in df.columns and pd.notna(row["test_id"]) else f"exp_{i}"
+            if test_id in seen_ids:
+                raise ValueError(f"Duplicate test_id found: '{test_id}'. Experiment test_ids must be unique.")
+            seen_ids.add(test_id)
 
             channel_val = row[channel]
+            if pd.isna(channel_val) or str(channel_val).strip() == "" or str(channel_val).strip().lower() == "nan":
+                raise ValueError("Channel mapping is missing or empty for experiment row.")
             channels = (
                 [c.strip() for c in channel_val.split(",")]
                 if isinstance(channel_val, str)
@@ -203,13 +245,16 @@ class IncrementalityTests:
             )
 
             geo_val = row[geo_scope]
-            geos = (
-                [g.strip() for g in geo_val.split(",")]
-                if isinstance(geo_val, str)
-                else [str(geo_val)]
-            )
+            if pd.isna(geo_val) or str(geo_val).strip() == "" or str(geo_val).strip().lower() == "nan":
+                geos = []
+            else:
+                geos = (
+                    [g.strip() for g in geo_val.split(",")]
+                    if isinstance(geo_val, str)
+                    else [str(geo_val)]
+                )
 
-            test_id = str(row["test_id"]) if "test_id" in df.columns else f"exp_{i}"
+
 
             exp = ExperimentRow(
                 test_id=test_id,
@@ -240,6 +285,11 @@ class IncrementalityTests:
 def _validate_experiment_against_dataset(
     exp: ExperimentRow, dataset: "MMMData"
 ) -> None:
+    if pd.isna(exp.start_date) or pd.isna(exp.end_date):
+        raise ValueError(f"experiment '{exp.test_id}' has missing (NaT) start or end date.")
+    if exp.start_date > exp.end_date:
+        raise ValueError(f"experiment '{exp.test_id}' start_date is after end_date.")
+
     known_channels = set(dataset.channels)
     for ch in exp.channel_bundle:
         if ch not in known_channels:
@@ -254,6 +304,14 @@ def _validate_experiment_against_dataset(
             f"unknown kpi '{exp.kpi}' in experiment '{exp.test_id}'; "
             f"known kpis: {sorted(known_kpis)}"
         )
+
+    known_geos = set(dataset.geos)
+    for g in exp.geo_scope:
+        if g not in known_geos:
+            raise ValueError(
+                f"unknown geo '{g}' in experiment '{exp.test_id}'; "
+                f"known geos: {sorted(known_geos)}"
+            )
 
     panel_start = dataset.start_date
     panel_end = dataset.end_date

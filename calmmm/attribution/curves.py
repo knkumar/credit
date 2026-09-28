@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import logging
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from calmmm.model.fit import MMMFit
 
 
-def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50) -> pd.DataFrame:
+def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50, grid_multiplier: float = 2.0) -> pd.DataFrame:
     """
     Evaluate the Hill saturation curve for one channel.
 
@@ -22,7 +25,7 @@ def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50) -> pd.Data
     Returns
     -------
     DataFrame with columns: spend, saturation, channel
-        spend is in original (unscaled) spend units, grid from 0 to 2×panel_max
+        spend is in original (unscaled) spend units, grid from 0 to grid_multiplier×panel_max
         saturation is Hill(spend/panel_max, alpha, k), values in [0, 1]
     """
     channels = fit.data.channels
@@ -31,17 +34,25 @@ def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50) -> pd.Data
 
     c_idx = channels.index(channel)
     hill_alpha, hill_k = _eval_hill_params(fit)
-    alpha_c = float(hill_alpha[c_idx])
-    k_c = float(hill_k[c_idx])
+    alpha_c = hill_alpha[..., c_idx]
+    k_c = hill_k[..., c_idx]
 
     media_max = fit._mmm._media_max  # [C]
     max_spend = float(media_max[c_idx])
 
-    x = np.linspace(0.0, 2.0 * max_spend, n_points)
+    x = np.linspace(0.0, grid_multiplier * max_spend, n_points)
     x_scaled = x / max(max_spend, 1e-8)
+    
+    if np.ndim(alpha_c) > 0:
+        alpha_c = alpha_c[..., np.newaxis]
+        k_c = k_c[..., np.newaxis]
+
     x_pow = np.clip(x_scaled, 0.0, None) ** alpha_c
     k_pow = k_c ** alpha_c
-    saturation = x_pow / (x_pow + k_pow + 1e-9)
+    saturation = x_pow / (x_pow + k_pow)
+
+    if np.ndim(saturation) > 1:
+        saturation = saturation.mean(axis=tuple(range(np.ndim(saturation) - 1)))
 
     return pd.DataFrame({"spend": x, "saturation": saturation, "channel": channel})
 
@@ -65,21 +76,37 @@ def spend_response_report(
     for channel in fit.data.channels:
         spend_col = spend_columns.get(channel)
         if spend_col is None or spend_col not in panel.columns:
-            continue
+            raise ValueError(f"Mapped spend column {spend_col!r} for channel {channel!r} not found in dataset.")
 
-        curve = saturation_curve(fit, channel=channel, n_points=n_points).sort_values("spend")
-        current_spend = float(panel[spend_col].mean())
+        spend_max = float(panel[spend_col].max())
+        required_spend = spend_max * spend_multiplier
+        media_max = float(fit._mmm._media_max[fit.data.channels.index(channel)])
+        required_mult = (required_spend / max(media_max, 1e-8)) * 1.1
+        grid_mult = max(2.0, spend_multiplier, required_mult)
+        curve = saturation_curve(fit, channel=channel, n_points=n_points, grid_multiplier=grid_mult).sort_values("spend")
+        spend_arr = panel[spend_col].dropna().values
+        if len(spend_arr) == 0:
+            logger.warning("Spend array is empty for channel %r; skipping.", channel)
+            continue
+            
+        current_spend = float(spend_arr.mean())
         increased_spend = current_spend * spend_multiplier
-        current_response = float(
-            np.interp(current_spend, curve["spend"], curve["saturation"])
-        )
-        increased_response = float(
-            np.interp(increased_spend, curve["spend"], curve["saturation"])
-        )
+        
+        current_responses = np.interp(spend_arr, curve["spend"].to_numpy(), curve["saturation"].to_numpy())
+        current_response = float(current_responses.mean())
+        
+        increased_responses = np.interp(spend_arr * spend_multiplier, curve["spend"].to_numpy(), curve["saturation"].to_numpy())
+        increased_response = float(increased_responses.mean())
         response_lift = increased_response - current_response
-        response_lift_pct = (
-            response_lift / current_response if current_response != 0 else np.nan
-        )
+        if current_response != 0.0:
+            response_lift_pct = response_lift / current_response
+        else:
+            logger.warning(
+                "Saturation lift percentage could not be calculated for channel %r "
+                "due to a zero baseline response.",
+                channel,
+            )
+            response_lift_pct = np.nan
 
         rows.append(
             {
@@ -91,6 +118,9 @@ def spend_response_report(
                 "increased_response": increased_response,
                 "response_lift": response_lift,
                 "response_lift_pct": response_lift_pct,
+                # Compatibility aliases for callers using the original names.
+                "saturation_lift": response_lift,
+                "saturation_lift_pct": response_lift_pct,
             }
         )
 
@@ -98,7 +128,7 @@ def spend_response_report(
 
 
 def _eval_hill_params(fit):
-    """Return (hill_alpha [C], hill_k [C]) as numpy arrays."""
+    """Return (hill_alpha, hill_k) as numpy arrays. If trace, preserves sample dimensions."""
     if fit.map_params is not None:
         return (
             np.array(fit.map_params["hill_alpha"]),
@@ -106,7 +136,7 @@ def _eval_hill_params(fit):
         )
     if fit.trace is not None:
         return (
-            fit.trace.posterior["hill_alpha"].values.mean(axis=(0, 1)),
-            fit.trace.posterior["hill_k"].values.mean(axis=(0, 1)),
+            fit.trace.posterior["hill_alpha"].values,
+            fit.trace.posterior["hill_k"].values,
         )
     raise ValueError("MMMFit has neither map_params nor trace.")

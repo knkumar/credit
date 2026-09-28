@@ -142,6 +142,12 @@ def _resolve_report_path(parts: tuple[str, str], reporting_dir: Path, artifacts_
 
 
 def _render_spend_response(df: pd.DataFrame, out: Path) -> None:
+    if "response_lift" not in df and "saturation_lift" in df:
+        df = df.assign(response_lift=df["saturation_lift"])
+    if "response_lift_pct" not in df and "saturation_lift_pct" in df:
+        df = df.assign(response_lift_pct=df["saturation_lift_pct"])
+    df = df.dropna(subset=["response_lift"])
+    if df.empty: return
     labels = df["channel"].astype(str).tolist()
     values = (df["response_lift"].astype(float) * 100.0).tolist()
     spend_multiplier = float(df["spend_multiplier"].iloc[0]) if "spend_multiplier" in df else 1.10
@@ -178,6 +184,8 @@ def _render_saturation_curves(df: pd.DataFrame, out: Path) -> None:
 
 
 def _render_roi(df: pd.DataFrame, out: Path) -> None:
+    df = df.dropna(subset=["roi"])
+    if df.empty: return
     grouped = (
         df.assign(label=df["kpi"].astype(str) + " / " + df["channel"].astype(str))
         .sort_values("roi", ascending=False)
@@ -195,6 +203,8 @@ def _render_roi(df: pd.DataFrame, out: Path) -> None:
 
 
 def _render_calibration(df: pd.DataFrame, out: Path) -> None:
+    df = df.dropna(subset=["lift_model", "lift_obs"])
+    if df.empty: return
     labels = df["test_id"].astype(str).tolist()
     model = df["lift_model"].astype(float).tolist()
     observed = df["lift_obs"].astype(float).tolist()

@@ -15,7 +15,12 @@ def test_add_calibration_likelihood_adds_observed_node(lift_tests, mmmdata):
     targets = build_calibration_targets(lift_tests, mmmdata, mmm._train_mask)
 
     with model:
-        add_calibration_likelihood(model, targets)
+        add_calibration_likelihood(
+            model, targets,
+            kpi_metadata=mmmdata.kpi_metadata,
+            kpis=mmmdata.kpis,
+            pop_array=mmm._pop_array[mmm._train_mask]
+        )
         obs_names = {v.name for v in model.observed_RVs}
 
     assert "lift_obs_search_holdout_q1" in obs_names
@@ -28,7 +33,12 @@ def test_add_calibration_likelihood_logp_finite(lift_tests, mmmdata):
     targets = build_calibration_targets(lift_tests, mmmdata, mmm._train_mask)
 
     with model:
-        add_calibration_likelihood(model, targets)
+        add_calibration_likelihood(
+            model, targets,
+            kpi_metadata=mmmdata.kpi_metadata,
+            kpis=mmmdata.kpis,
+            pop_array=mmm._pop_array[mmm._train_mask]
+        )
         lp = model.compile_logp()(model.initial_point())
 
     assert np.isfinite(lp)
@@ -41,7 +51,12 @@ def test_add_calibration_likelihood_empty_targets(mmmdata):
     n_obs_before = len(model.observed_RVs)
 
     with model:
-        add_calibration_likelihood(model, [])
+        add_calibration_likelihood(
+            model, [],
+            kpi_metadata=mmmdata.kpi_metadata,
+            kpis=mmmdata.kpis,
+            pop_array=mmm._pop_array[mmm._train_mask]
+        )
 
     assert len(model.observed_RVs) == n_obs_before
 
@@ -65,7 +80,12 @@ def test_add_calibration_likelihood_unsupported_estimand_raises(lift_tests, mmmd
 
     with model:
         with pytest.raises(NotImplementedError, match="immediate"):
-            add_calibration_likelihood(model, [target])
+            add_calibration_likelihood(
+                model, [target],
+                kpi_metadata=mmmdata.kpi_metadata,
+                kpis=mmmdata.kpis,
+                pop_array=mmm._pop_array[mmm._train_mask]
+            )
 
 
 def test_add_calibration_likelihood_unsupported_likelihood_raises(lift_tests, mmmdata):
@@ -87,4 +107,9 @@ def test_add_calibration_likelihood_unsupported_likelihood_raises(lift_tests, mm
 
     with model:
         with pytest.raises(NotImplementedError, match="lognormal"):
-            add_calibration_likelihood(model, [target])
+            add_calibration_likelihood(
+                model, [target],
+                kpi_metadata=mmmdata.kpi_metadata,
+                kpis=mmmdata.kpis,
+                pop_array=mmm._pop_array[mmm._train_mask]
+            )

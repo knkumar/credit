@@ -1,3 +1,10 @@
 .agents/
 .serena/
-uv.lock
+/.agent/
+/paper/
+/AGENTS.md
+
+# Python and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/

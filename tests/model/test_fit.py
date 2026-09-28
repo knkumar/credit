@@ -96,6 +96,7 @@ def test_mcmc_diagnostics_returns_arviz_summary_columns():
 def test_fit_metrics_uses_training_predictions():
     class _FakeData:
         kpis = ["applications"]
+        kpi_metadata = pd.DataFrame([{"kpi": "applications", "likelihood": "gaussian"}])
 
     class _FakeMMM:
         _obs_array = np.array([[[10.0]], [[20.0]], [[30.0]]])

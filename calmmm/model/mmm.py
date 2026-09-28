@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+import warnings
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from calmmm.data.containers import IncrementalityTests
+    from calmmm.model.fit import MMMFit
 
 import numpy as np
+import pandas as pd
 import pymc as pm
 import pytensor.tensor as pt
 
 logger = logging.getLogger(__name__)
+
+from scipy.special import logit
 
 from calmmm.data.containers import MMMData
 from calmmm.data.validation import validate_mmmdata
@@ -40,6 +48,8 @@ class HierarchicalMMM:
         holdout_fraction: float = 0.2,
         interaction_graph: Optional[InteractionGraph] = None,
     ) -> None:
+        if not (0.0 <= holdout_fraction < 1.0):
+            raise ValueError("holdout_fraction must be in [0.0, 1.0)")
         self.priors = priors or PriorConfig()
         self.n_fourier_pairs = n_fourier_pairs
         self.holdout_fraction = holdout_fraction
@@ -53,7 +63,11 @@ class HierarchicalMMM:
         self._media_max: Optional[np.ndarray] = None
         self._fourier_matrix: Optional[np.ndarray] = None
         self._pop_array: Optional[np.ndarray] = None
+        self._ctrl_array: Optional[np.ndarray] = None
+        self._ctrl_mean: Optional[np.ndarray] = None
+        self._ctrl_std: Optional[np.ndarray] = None
         self._calibration_targets: list = []
+        self._last_experiments = None
 
     @property
     def model(self) -> "Optional[pm.Model]":
@@ -65,6 +79,8 @@ class HierarchicalMMM:
 
         The model uses a log-link for all KPIs:
             log(E[y]) = baseline[t,g,k] + media_contrib[t,g,k]
+            (For LogNormal likelihood, mu = baseline + media_contrib models the log-median,
+             and the true log-mean includes the variance term: mu + sigma^2 / 2)
 
         Media pipeline:
             raw_spend → scale (÷ panel max) → geometric adstock → Hill saturation
@@ -79,24 +95,21 @@ class HierarchicalMMM:
         """
         validate_mmmdata(data).raise_if_errors()
 
+        # A reused model must learn preprocessing statistics from the new
+        # dataset. A fresh model may already contain copied training scalers;
+        # holdout evaluation relies on that explicit transfer before its first
+        # build.
+        if self._data is not None and self._data is not data:
+            self._media_max = None
+            self._ctrl_mean = None
+            self._ctrl_std = None
+
         self._data = data
         coords = build_coords(data, n_fourier_pairs=self.n_fourier_pairs)
         obs_array, media_array, pop_array = build_arrays(data)
         ctrl_array, _ctrl_names = build_controls_array(data)
 
         T = len(data.times)
-
-        # Scale media per-channel by panel max
-        media_max = media_array.max(axis=(0, 1), keepdims=True)  # [1, 1, C]
-        self._media_max = media_max.squeeze()  # [C] — per-channel panel max spend
-        media_scaled = media_array / np.maximum(media_max, 1e-8)
-
-        # Fourier features: t = 0-based week index
-        fourier_matrix = fourier_features(
-            t=np.arange(T, dtype=float),
-            n_pairs=self.n_fourier_pairs,
-            period=52.0,
-        ).astype(np.float64)
 
         # Holdout mask
         n_holdout = int(T * self.holdout_fraction)
@@ -105,30 +118,103 @@ class HierarchicalMMM:
             train_mask[-n_holdout:] = False
         self._train_mask = train_mask
 
+        # Scale media per-channel by panel max (from train set)
+        if self._media_max is None:
+            media_max = media_array[train_mask].max(axis=(0, 1), keepdims=True)  # [1, 1, C]
+            global_max = media_array.max(axis=(0, 1), keepdims=True)
+            if (global_max == 0.0).any():
+                logger.warning("The dataset has zero media spend for one or more channels, indicating a likely data issue.")
+            media_max = np.where(media_max == 0.0, global_max, media_max)
+            media_max = np.maximum(media_max, 1e-8)
+            self._media_max = media_max[0, 0, :]  # [C] — per-channel panel max spend
+        media_scaled = media_array / np.maximum(self._media_max, 1e-8)
+
+        # Determine period from data times
+        if len(data.times) < 2:
+            raise ValueError("Insufficient data: at least 2 time steps are required.")
+
+        diffs = pd.Series(data.times).diff().dropna()
+        median_days = diffs.dt.total_seconds().median() / 86400.0
+        if median_days <= 0.0:
+            raise ValueError("The dataset contains zero-spaced or completely duplicated time steps.")
+        period = 365.25 / median_days
+        if 11.5 < period < 12.5:
+            period = 12.0
+        
+        standard_periods = [1.0, 4.0, 12.0, 26.0, 26.08, 52.17, 365.25]
+        if not any(abs(period - sp) < 0.15 * sp for sp in standard_periods):
+            logger.warning(
+                "Inferred seasonality period (%.2f) deviates significantly from standard cyclic patterns (e.g. 12, 52, 365).",
+                period
+            )
+
+        # Fourier features: t = actual elapsed time normalized
+        elapsed_days = (pd.Series(data.times) - data.times[0]).dt.total_seconds() / 86400.0
+        t_actual = (elapsed_days / median_days).to_numpy(dtype=float)
+        fourier_matrix = fourier_features(
+            t=t_actual,
+            period=period,
+            n_pairs=self.n_fourier_pairs,
+        ).astype(np.float64)
+
         logger.info(
             "build_model: T=%d, G=%d, K=%d, C=%d, holdout=%d",
             T, len(data.geos), len(data.kpis), len(data.channels), n_holdout,
         )
 
-        # Baseline intercept initialization: log(mean_outcome) per KPI×geo
-        obs_mean = np.nanmean(obs_array, axis=0)  # [G, K]
-        obs_mean_log = np.log(np.maximum(obs_mean.T, 1.0))  # [K, G]
+        # Baseline intercept initialization: log(mean_outcome) per KPI×geo (logit for binomial)
+        obs_mean_log = np.zeros((len(data.kpis), len(data.geos)))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            for k, kpi in enumerate(data.kpis):
+                likelihood = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+                if likelihood == "binomial":
+                    p = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k] / np.maximum(pop_array[train_mask, :, k], 1.0), axis=0), nan=0.0)
+                    p = np.clip(p, 1e-4, 1.0 - 1e-4)
+                    obs_mean_log[k, :] = logit(p)
+                elif likelihood == "lognormal":
+                    obs_mean_log[k, :] = np.nan_to_num(np.nanmean(np.log(np.maximum(obs_array[train_mask, :, k], 1e-8)), axis=0))
+                else:
+                    obs_mean = np.nan_to_num(np.nanmean(obs_array[train_mask, :, k], axis=0), nan=0.0)
+                    if (obs_mean <= 0).any():
+                        raise ValueError(f"Training slice contains zero or negative average outcomes for KPI '{kpi}', which are incompatible with the log-link prior initialization.")
+                    obs_mean_log[k, :] = np.log(obs_mean)
 
         # Store for use in fit()
         self._obs_array = obs_array
         self._media_scaled = media_scaled
         self._fourier_matrix = fourier_matrix
         self._pop_array = pop_array
-        self._ctrl_array = ctrl_array
+        if ctrl_array is not None:
+            if self._ctrl_mean is None:
+                ctrl_train_raw = ctrl_array[train_mask]
+                self._ctrl_std = np.where(ctrl_train_raw.std(axis=0) == 0, 1.0, ctrl_train_raw.std(axis=0))
+                self._ctrl_mean = ctrl_train_raw.mean(axis=0)
+            self._ctrl_array = (ctrl_array - self._ctrl_mean) / self._ctrl_std
+        else:
+            self._ctrl_array = None
 
         # Train slices
         X_media_train = media_scaled[train_mask]       # [T_train, G, C]
         fourier_train = fourier_matrix[train_mask]     # [T_train, F]
         obs_train = obs_array[train_mask]              # [T_train, G, K]
         pop_train = pop_array[train_mask]              # [T_train, G, K]
-        ctrl_train = ctrl_array[train_mask] if ctrl_array is not None else None  # [T_train, G, N] or None
+        ctrl_train = self._ctrl_array[train_mask] if self._ctrl_array is not None else None  # [T_train, G, N] or None
 
+        # Note: The "time" coordinate here specifically represents `train_time` for the 
+        # PyMC model graph. This resolves ambiguity for external trace evaluation 
+        # without requiring a codebase-wide string refactor.
+        coords["time"] = [t for i, t in enumerate(data.times) if train_mask[i]]
         with pm.Model(coords=coords) as model:
+            # Wrap inputs in Data to avoid recompilation
+            X_media_train_data = pm.Data("X_media", X_media_train, dims=("time", "geo", "channel"))
+            fourier_train_data = pm.Data("fourier_features", fourier_train, dims=("time", "fourier"))
+            obs_train_data = np.ma.masked_invalid(obs_train)
+            pop_train_data = pm.Data("pop_array", np.nan_to_num(pop_train, nan=1.0), dims=("time", "geo", "kpi"))
+            
+            ctrl_train_data = None
+            if ctrl_train is not None:
+                ctrl_train_data = pm.Data("ctrl_array", ctrl_train, dims=("time", "geo", "control"))
             # Adstock params
             decay = pm.Beta(
                 "adstock_decay",
@@ -138,7 +224,7 @@ class HierarchicalMMM:
             )
             # Adstock transform
             X_adstocked = geometric_adstock_pt(
-                pt.as_tensor_variable(X_media_train), decay
+                X_media_train_data, decay
             )  # [T_train, G, C]
 
             # Saturation params
@@ -152,7 +238,7 @@ class HierarchicalMMM:
             X_sat = hill_saturation_pt(X_adstocked, hill_alpha, hill_k)  # [T_train, G, C]
 
             # Baseline
-            baseline = _build_baseline(fourier_train, obs_mean_log, self.priors, ctrl_train)
+            baseline = _build_baseline(fourier_train_data, obs_mean_log, self.priors, ctrl_train_data)
 
             # Media hierarchy, with optional channel-to-channel interactions
             apply_interactions = None
@@ -169,7 +255,7 @@ class HierarchicalMMM:
 
             # Observation likelihoods (train only)
             _add_likelihood(
-                mu, obs_train, pop_train,
+                mu, obs_train_data, pop_train_data,
                 data.kpi_metadata, data.kpis, self.priors
             )
 
@@ -178,10 +264,17 @@ class HierarchicalMMM:
         if experiments is not None:
             targets = build_calibration_targets(experiments, data, self._train_mask)
             with model:
-                add_calibration_likelihood(model, targets)
+                add_calibration_likelihood(
+                    model, targets,
+                    kpi_metadata=data.kpi_metadata,
+                    kpis=data.kpis,
+                    pop_array=pop_train_data,
+                )
             self._calibration_targets = targets
         else:
             self._calibration_targets = []
+            
+        self._last_experiments = experiments
 
         return model
 
@@ -189,7 +282,7 @@ class HierarchicalMMM:
         self,
         data: MMMData,
         *,
-        experiments=None,
+        experiments: Optional["IncrementalityTests"] = None,
         mode: str = "sample",
         **kwargs,
     ) -> "MMMFit":
@@ -208,13 +301,18 @@ class HierarchicalMMM:
         """
         from calmmm.model.fit import MMMFit
 
-        logger.info("fit: mode=%s", mode)
+        has_experiments = experiments is not None and len(experiments) > 0
+        has_targets = bool(self._calibration_targets)
+        curr_exps = experiments if experiments is not None else []
+        last_exps = getattr(self, "_last_experiments", None)
+        last_exps = last_exps if last_exps is not None else []
 
         if (
             self._model is None
             or self._data is not data
-            or (experiments is not None and not self._calibration_targets)
-            or (experiments is None and bool(self._calibration_targets))
+            or (has_experiments and not has_targets)
+            or (not has_experiments and has_targets)
+            or curr_exps != last_exps
         ):
             self.build_model(data, experiments=experiments)
 
@@ -230,9 +328,10 @@ class HierarchicalMMM:
             kwargs.setdefault("progressbar", False)
             # Extract n before passing to pm.fit; don't forward it to approx.sample
             n = kwargs.pop("n", 10000)
+            draws = kwargs.pop("draws", 200)
             with model:
                 approx = pm.fit(n=n, **kwargs)
-                trace = approx.sample(draws=200)
+                trace = approx.sample(draws=draws)
             return MMMFit(trace=trace, map_params=None, model=model, data=data, _mmm=self, calibration_targets=self._calibration_targets)
 
         elif mode == "map":

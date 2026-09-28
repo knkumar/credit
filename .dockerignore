@@ -1,0 +1,14 @@
+.git
+.agent
+.agents
+AGENTS.md
+.pytest_cache
+.serena
+.venv
+**/__pycache__
+**/*.pyc
+artifacts
+memory_monitor.log
+outputs/*.pptx
+paper
+reporting

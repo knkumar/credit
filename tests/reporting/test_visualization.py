@@ -1,7 +1,9 @@
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
+from calmmm.attribution.curves import spend_response_report
 from calmmm.reporting.visualization import build_summary_table, render_reporting_outputs
 
 
@@ -103,6 +105,65 @@ def test_render_reporting_outputs_writes_visuals_and_summary(tmp_path):
     for path in expected:
         assert path.exists()
         assert path.stat().st_size > 0
+
+
+def test_spend_response_producer_output_renders_without_schema_translation(tmp_path):
+    class FakeData:
+        channels = ["search"]
+
+    class FakeMMM:
+        _media_max = np.array([400.0])
+
+    class FakeFit:
+        data = FakeData()
+        _mmm = FakeMMM()
+        map_params = {
+            "hill_alpha": np.array([1.0]),
+            "hill_k": np.array([0.5]),
+        }
+        trace = None
+
+    reporting_dir = tmp_path / "reporting"
+    artifacts_dir = tmp_path / "artifacts"
+    reporting_dir.mkdir()
+    artifacts_dir.mkdir()
+    report = spend_response_report(
+        FakeFit(),
+        pd.DataFrame({"search_spend": [100.0, 300.0]}),
+        spend_columns={"search": "search_spend"},
+    )
+    report.to_csv(reporting_dir / "spend_response.csv", index=False)
+
+    outputs = render_reporting_outputs(
+        reporting_dir=reporting_dir,
+        artifacts_dir=artifacts_dir,
+    )
+
+    assert {"response_lift", "response_lift_pct"}.issubset(report.columns)
+    assert reporting_dir / "spend_response.svg" in outputs
+    assert (reporting_dir / "spend_response.svg").stat().st_size > 0
+
+
+def test_spend_response_renderer_accepts_legacy_saturation_lift_names(tmp_path):
+    reporting_dir = tmp_path / "reporting"
+    artifacts_dir = tmp_path / "artifacts"
+    reporting_dir.mkdir()
+    artifacts_dir.mkdir()
+    pd.DataFrame(
+        {
+            "channel": ["search"],
+            "spend_multiplier": [1.1],
+            "saturation_lift": [0.04],
+            "saturation_lift_pct": [0.10],
+        }
+    ).to_csv(reporting_dir / "spend_response.csv", index=False)
+
+    outputs = render_reporting_outputs(
+        reporting_dir=reporting_dir,
+        artifacts_dir=artifacts_dir,
+    )
+
+    assert reporting_dir / "spend_response.svg" in outputs
 
 
 def test_render_reporting_outputs_labels_plot_units(tmp_path):

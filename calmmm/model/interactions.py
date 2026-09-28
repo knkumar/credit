@@ -10,11 +10,14 @@ import pytensor.tensor as pt
 class ChannelInteraction:
     """
     One directed edge in a channel interaction graph: `source`'s signal
-    multiplicatively rescales `target`'s contribution.
+    multiplicatively rescales `target`'s contribution. This interaction acts
+    as an absolute magnitude scaler, meaning a positive interaction increases
+    the absolute magnitude of both synergistic (positive) and cannibalizing
+    (negative) baseline contributions.
 
     prior : "half_normal" (default) draws gamma ~ HalfNormal(prior_sigma) — boost-only,
-            contribution can only increase. "normal" draws gamma ~ Normal(0, prior_sigma) —
-            two-sided, for hypothesized suppression/cannibalization.
+            absolute magnitude can only increase. "normal" draws gamma ~ Normal(0, prior_sigma) —
+            two-sided, for hypothesized suppression/cannibalization (decreases magnitude if negative).
     """
     source: str
     target: str
@@ -90,9 +93,6 @@ class InteractionGraph:
             )
 
 
-import pymc as pm
-
-
 def build_interaction_step(
     graph: InteractionGraph,
     *,
@@ -116,6 +116,8 @@ def build_interaction_step(
     gamma's prior scale stays comparable regardless of where in the graph
     an edge sits.
     """
+    import pymc as pm
+
     graph.validate_channels(channels)
     channel_idx = {name: i for i, name in enumerate(channels)}
     order = graph.topological_order()
@@ -138,15 +140,15 @@ def build_interaction_step(
                     signal = X_adstock[:, :, channel_idx[edge.source]][:, :, None]  # [T, G, 1]
 
                 if edge.prior == "half_normal":
-                    gamma = pm.HalfNormal(f"gamma_{edge.source}_{edge.target}", sigma=edge.prior_sigma)
-                    boost_signal = pt.maximum(signal, 0.0)
-                    contrib = contrib * (1.0 + gamma * boost_signal)
+                    gamma = pm.HalfNormal(f"gamma_{edge.source}_{edge.target}", sigma=edge.prior_sigma, dims="kpi")
+                    boost_signal = pt.abs(signal)
+                    contrib = contrib * (1.0 + gamma[None, None, :] * boost_signal)
                 else:  # "normal" — two-sided, exponential form guarantees strict positivity
-                    gamma = pm.Normal(f"gamma_{edge.source}_{edge.target}", mu=0.0, sigma=edge.prior_sigma)
-                    contrib = contrib * pt.exp(gamma * signal)
+                    gamma = pm.Normal(f"gamma_{edge.source}_{edge.target}", mu=0.0, sigma=edge.prior_sigma, dims="kpi")
+                    contrib = contrib * pt.exp(gamma[None, None, :] * signal)
 
             slices[name] = contrib
-            chain_scales[name] = pt.mean(pt.abs(contrib)) + 1e-8
+            chain_scales[name] = pt.mean(pt.abs(contrib), axis=(0, 1), keepdims=True) + 1e-8
 
         return pt.stack([slices[name] for name in channels], axis=-1)  # [T, G, K, C]
 

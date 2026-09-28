@@ -80,6 +80,22 @@ class ExperimentRow:
     ci_level: float = 0.95  # confidence level for the reported CI; 0.95 → z≈1.96
 
     def __post_init__(self) -> None:
+        import math
+
+        self.channel_bundle = _normalize_experiment_dimension(
+            self.channel_bundle,
+            field_name="channel_bundle",
+            allow_empty=False,
+        )
+        self.geo_scope = _normalize_experiment_dimension(
+            self.geo_scope,
+            field_name="geo_scope",
+            allow_empty=True,
+        )
+
+        if math.isnan(self.lift) or math.isinf(self.lift):
+            raise ValueError("lift must be a finite number")
+
         if self.se is None:
             if self.ci_lower is None or self.ci_upper is None:
                 raise ValueError(
@@ -89,8 +105,65 @@ class ExperimentRow:
                 raise ValueError(
                     f"ci_upper ({self.ci_upper}) must be >= ci_lower ({self.ci_lower})"
                 )
-            from scipy.stats import norm
-            z = norm.ppf((1 + self.ci_level) / 2)
+            if self.calibration_likelihood == CalibrationLikelihood.STUDENT_T:
+                from scipy.stats import t
+                z = t.ppf((1 + self.ci_level) / 2, df=self.student_t_nu)
+            else:
+                from scipy.stats import norm
+                z = norm.ppf((1 + self.ci_level) / 2)
             self.se = (self.ci_upper - self.ci_lower) / (2 * z)
-        if self.se <= 0:
-            raise ValueError(f"se must be > 0, got {self.se}")
+        
+        if self.se <= 0 or math.isnan(self.se) or math.isinf(self.se):
+            raise ValueError(f"se must be > 0 and finite, got {self.se}")
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ExperimentRow):
+            return NotImplemented
+        return (
+            self.test_id == other.test_id
+            and self.channel_bundle == other.channel_bundle
+            and self.kpi == other.kpi
+            and self.geo_scope == other.geo_scope
+            and self.start_date == other.start_date
+            and self.end_date == other.end_date
+            and self.lift == other.lift
+            and self.se == other.se
+            and self.ci_lower == other.ci_lower
+            and self.ci_upper == other.ci_upper
+            and self.calibration_likelihood == other.calibration_likelihood
+            and self.student_t_nu == other.student_t_nu
+            and self.estimand == other.estimand
+            and self.ci_level == other.ci_level
+        )
+
+
+def _normalize_experiment_dimension(
+    values: list[str],
+    *,
+    field_name: str,
+    allow_empty: bool,
+) -> list[str]:
+    if not isinstance(values, list):
+        raise ValueError(f"{field_name} must be a list of strings")
+    if not values and not allow_empty:
+        raise ValueError(f"{field_name} must contain at least one value")
+
+    normalized = []
+    for value in values:
+        if not isinstance(value, str):
+            raise ValueError(f"{field_name} must contain only strings")
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError(f"{field_name} contains an empty value")
+        normalized.append(stripped)
+
+    seen = set()
+    duplicates = []
+    for value in normalized:
+        if value in seen and value not in duplicates:
+            duplicates.append(value)
+        seen.add(value)
+    if duplicates:
+        raise ValueError(f"{field_name} contains duplicate values: {duplicates}")
+
+    return normalized

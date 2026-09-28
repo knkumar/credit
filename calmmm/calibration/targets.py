@@ -80,15 +80,24 @@ def build_calibration_targets(
     for exp in experiments:
         # Collect time indices in experiment window that fall in training
         window_filtered = []
+        expected_dates_in_panel = 0
         for abs_i, t in enumerate(times):
-            if exp.start_date <= t <= exp.end_date and abs_i in abs_to_filtered:
-                window_filtered.append(abs_to_filtered[abs_i])
+            if exp.start_date <= t <= exp.end_date:
+                expected_dates_in_panel += 1
+                if abs_i in abs_to_filtered:
+                    window_filtered.append(abs_to_filtered[abs_i])
 
         if not window_filtered:
             raise ValueError(
                 f"Experiment '{exp.test_id}' window "
                 f"[{exp.start_date.date()}, {exp.end_date.date()}] "
                 f"has no training time steps (all fall in holdout or outside panel)."
+            )
+            
+        if expected_dates_in_panel > len(window_filtered):
+            raise ValueError(
+                f"Experiment '{exp.test_id}' partially overlaps with the holdout window. "
+                "Experiments must fall entirely within the training set."
             )
 
         t_indices = np.array(window_filtered, dtype=int)
@@ -104,6 +113,23 @@ def build_calibration_targets(
             g_indices = np.arange(len(geos), dtype=int)
         c_indices = np.array([c_idx[c] for c in exp.channel_bundle], dtype=int)
         k_index = k_idx[exp.kpi]
+
+        likelihood_type = data.kpi_metadata.loc[data.kpi_metadata["kpi"] == exp.kpi, "likelihood"].values[0]
+        if likelihood_type == "binomial":
+            df = data.observations
+            mask_t = df["time"].between(exp.start_date, exp.end_date)
+            if exp.geo_scope:
+                mask_g = df["geo"].isin(exp.geo_scope)
+            else:
+                mask_g = pd.Series(True, index=df.index)
+            mask_k = df["kpi"] == exp.kpi
+            sliced_df = df[mask_t & mask_g & mask_k]
+            if "population" not in sliced_df.columns or pd.isna(sliced_df["population"]).any():
+                raise ValueError(
+                    f"Experiment '{exp.test_id}' references a binomial KPI ('{exp.kpi}') but the population data "
+                    f"contains missing/NaN values in the experiment window. Cannot calibrate against binomial targets "
+                    f"with missing population data."
+                )
 
         targets.append(
             CalibrationTarget(

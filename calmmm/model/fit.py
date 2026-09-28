@@ -1,31 +1,53 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pymc as pm
+from scipy.special import expit
 
 from calmmm.data.containers import MMMData
 
 if TYPE_CHECKING:
     from calmmm.model.mmm import HierarchicalMMM
+    from calmmm.calibration.targets import IncrementalityTests
 
 
-def eval_mu_and_channel_contrib(fit: "MMMFit"):
-    """Return (mu [T,G,K], channel_contrib [T,G,K,C]) as numpy arrays."""
+def eval_mu_and_channel_contrib(fit: "MMMFit") -> tuple[np.ndarray, np.ndarray]:
+    """Return (mu, channel_contrib) as numpy arrays. 
+    Shape [S, T, G, K] and [S, T, G, K, C] for traces, or [T, G, K] and [T, G, K, C] for MAP."""
     if fit.map_params is not None:
         return (
             np.array(fit.map_params["mu"]),
             np.array(fit.map_params["channel_contrib"]),
         )
     if fit.trace is not None:
+        mu = fit.trace.posterior["mu"].values
+        cc = fit.trace.posterior["channel_contrib"].values
         return (
-            fit.trace.posterior["mu"].values.mean(axis=(0, 1)),
-            fit.trace.posterior["channel_contrib"].values.mean(axis=(0, 1)),
+            mu.reshape(-1, *mu.shape[2:]),
+            cc.reshape(-1, *cc.shape[2:]),
         )
     raise ValueError("MMMFit has neither map_params nor trace.")
+
+
+def get_sigma_val(fit: "MMMFit", kpi: str, target_ndim: int) -> float | np.ndarray:
+    """Helper to extract and reshape the lognormal sigma parameter for a given KPI."""
+    if fit.map_params is not None and f"sigma_{kpi}" in fit.map_params:
+        sigma_val = fit.map_params[f"sigma_{kpi}"]
+    elif fit.trace is not None and f"sigma_{kpi}" in fit.trace.posterior:
+        sigma_samples = fit.trace.posterior[f"sigma_{kpi}"].values
+        sigma_val = sigma_samples
+    else:
+        sigma_val = 0.0
+        
+    sigma_val = np.asarray(sigma_val).reshape(-1)
+    while sigma_val.ndim < target_ndim - 1:
+        sigma_val = np.expand_dims(sigma_val, axis=-1)
+    return sigma_val
 
 
 def _regression_metrics(
@@ -37,12 +59,24 @@ def _regression_metrics(
     for k, kpi in enumerate(kpis):
         y_true = observed[:, :, k].ravel()
         y_pred = predicted[:, :, k].ravel()
+        valid = ~np.isnan(y_true) & ~np.isnan(y_pred)
+        y_true = y_true[valid]
+        y_pred = y_pred[valid]
+        
+        if len(y_true) == 0:
+            metrics[f"rmse_{kpi}"] = np.nan
+            metrics[f"r2_{kpi}"] = np.nan
+            continue
+            
         residual = y_true - y_pred
         sse = float(np.sum(residual**2))
         centered = y_true - float(np.mean(y_true))
         sst = float(np.sum(centered**2))
         metrics[f"rmse_{kpi}"] = float(np.sqrt(np.mean(residual**2)))
-        metrics[f"r2_{kpi}"] = float(1.0 - sse / sst) if sst > 0 else np.nan
+        if sst < 1e-8:
+            metrics[f"r2_{kpi}"] = 1.0 if sse == 0.0 else 0.0
+        else:
+            metrics[f"r2_{kpi}"] = float(1.0 - sse / sst)
     return metrics
 
 
@@ -66,7 +100,7 @@ class MMMFit:
     _mmm: Optional["HierarchicalMMM"] = field(default=None, repr=False)
     calibration_targets: list = field(default_factory=list)
 
-    def to_netcdf(self, path) -> None:
+    def to_netcdf(self, path: Union[str, Path]) -> None:
         """
         Serialize the fit to a netCDF file.
 
@@ -103,7 +137,7 @@ class MMMFit:
             # when variables have different sizes.
             data_vars = {}
             for k, v in self.map_params.items():
-                arr = _np.atleast_1d(v)
+                arr = _np.asarray(v)
                 dims = [f"{k}_dim_{i}" for i in range(arr.ndim)]
                 data_vars[k] = _xr.DataArray(arr, dims=dims)
             ds = _xr.Dataset(data_vars)
@@ -114,7 +148,13 @@ class MMMFit:
             )
 
     @classmethod
-    def from_netcdf(cls, path, data, mmm) -> "MMMFit":
+    def from_netcdf(
+        cls, 
+        path: Union[str, Path], 
+        data: "MMMData", 
+        mmm: "HierarchicalMMM", 
+        experiments: Optional["IncrementalityTests"] = None
+    ) -> "MMMFit":
         """
         Reconstruct an ``MMMFit`` from a netCDF file written by ``to_netcdf``.
 
@@ -143,7 +183,7 @@ class MMMFit:
 
         # Reconstruct the PyMC model (required even for MAP fits so downstream
         # methods that need self.model work correctly).
-        mmm.build_model(data)
+        mmm.build_model(data, experiments=experiments)
         model = getattr(mmm, "_model", None)
 
         # Try loading as arviz InferenceData first.
@@ -158,8 +198,9 @@ class MMMFit:
                     _mmm=mmm,
                     calibration_targets=list(getattr(mmm, "_calibration_targets", [])),
                 )
-        except (ValueError, KeyError):
-            pass
+        except (ValueError, KeyError) as e:
+            import logging
+            logging.warning(f"Failed to load as arviz InferenceData: {e}. Falling back to xarray Dataset.")
 
         # Fall back to MAP params stored as a plain xarray Dataset.
         with _xr.open_dataset(path) as ds:
@@ -203,25 +244,24 @@ class MMMFit:
 
         obs_holdout = mmm._obs_array[holdout_mask]  # [T_holdout, G, K]
 
-        # Build a full-T model (no holdout) to evaluate mu over all time steps
-        full_mmm = mmm.__class__(
+        # Rebuild a full-T model context to avoid mutating the training graph
+        eval_mmm = type(mmm)(
             priors=mmm.priors,
             n_fourier_pairs=mmm.n_fourier_pairs,
             holdout_fraction=0.0,
+            interaction_graph=mmm.interaction_graph,
         )
-        full_model = full_mmm.build_model(mmm._data)
+        eval_mmm._media_max = mmm._media_max
+        if getattr(mmm, "_ctrl_mean", None) is not None:
+            eval_mmm._ctrl_mean = mmm._ctrl_mean
+            eval_mmm._ctrl_std = mmm._ctrl_std
+        full_model = eval_mmm.build_model(mmm._data, experiments=mmm._last_experiments)
 
         if self.map_params is not None:
             # Evaluate mu on the full-T model using the *trained* parameter values.
-            # model.initial_point() gives the key set for all free (latent) RVs in the
-            # transformed space — the same format find_MAP() returns.  Filtering
-            # map_params to these keys excludes deterministics (mu, channel_contrib,
-            # scale_kpi, …) which would cause "too many parameters" in compile_fn.
-            latent_init = full_model.initial_point()
-            latent_params = {k: self.map_params[k] for k in latent_init if k in self.map_params}
             with full_model:
                 fn = full_model.compile_fn(full_model["mu"])
-                mu_val = fn(latent_params)
+                mu_val = fn(self.map_params)
             mu_holdout = np.array(mu_val)[holdout_mask]
 
         elif self.trace is not None:
@@ -230,16 +270,33 @@ class MMMFit:
                     self.trace,
                     var_names=["mu"],
                     progressbar=False,
+                    predictions=True,
                 )
-            # ppc.posterior_predictive["mu"]: [chains, draws, T, G, K]
-            mu_samples = ppc.posterior_predictive["mu"].values
-            mu_holdout = mu_samples.mean(axis=(0, 1))[holdout_mask]  # [T_holdout, G, K]
+            if hasattr(ppc, "predictions"):
+                mu_samples = ppc.predictions["mu"].values
+            else:
+                mu_samples = ppc.posterior_predictive["mu"].values
+            mu_samples = mu_samples.reshape(-1, *mu_samples.shape[2:])
+            mu_holdout = mu_samples[:, holdout_mask, ...]  # [S, T_holdout, G, K]
 
         else:
             raise ValueError("No params or trace available for prediction.")
 
-        # mu is on log scale → exp to get predicted mean
-        pred_mean = np.exp(mu_holdout)  # [T_holdout, G, K]
+        # Apply inverse link to get predicted mean
+        pred_mean = np.zeros_like(mu_holdout)  # [S?, T_holdout, G, K]
+        for k, kpi in enumerate(mmm._data.kpis):
+            likelihood = mmm._data.kpi_metadata.loc[mmm._data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+            if likelihood == "binomial":
+                pop_k = mmm._pop_array[holdout_mask][..., k]
+                pred_mean[..., k] = expit(mu_holdout[..., k]) * pop_k
+            elif likelihood == "lognormal":
+                sigma_val = get_sigma_val(self, kpi, mu_holdout.ndim)
+                pred_mean[..., k] = np.exp(mu_holdout[..., k] + sigma_val**2 / 2.0)
+            else:
+                pred_mean[..., k] = np.exp(mu_holdout[..., k])
+
+        if pred_mean.ndim > 3:
+            pred_mean = np.nanmean(pred_mean, axis=0)
 
         return _regression_metrics(obs_holdout, pred_mean, mmm._data.kpis)
 
@@ -258,7 +315,22 @@ class MMMFit:
 
         mu, _channel_contrib = eval_mu_and_channel_contrib(self)
         observed = mmm._obs_array[mmm._train_mask]
-        predicted = np.exp(mu)
+        
+        predicted = np.zeros_like(mu)
+        for k, kpi in enumerate(self.data.kpis):
+            likelihood = self.data.kpi_metadata.loc[self.data.kpi_metadata["kpi"] == kpi, "likelihood"].values[0]
+            if likelihood == "binomial":
+                pop_k = mmm._pop_array[mmm._train_mask][..., k]
+                predicted[..., k] = expit(mu[..., k]) * pop_k
+            elif likelihood == "lognormal":
+                sigma_val = get_sigma_val(self, kpi, mu.ndim)
+                predicted[..., k] = np.exp(mu[..., k] + sigma_val**2 / 2.0)
+            else:
+                predicted[..., k] = np.exp(mu[..., k])
+                
+        if predicted.ndim > 3:
+            predicted = np.nanmean(predicted, axis=0)
+            
         return _regression_metrics(observed, predicted, self.data.kpis)
 
     def mcmc_diagnostics(self, var_names: list[str] | None = None) -> pd.DataFrame:
@@ -275,10 +347,11 @@ class MMMFit:
 
         import arviz as az
 
-        default_vars = ["adstock_decay", "hill_alpha", "hill_k"]
-        requested = var_names or [
-            name for name in default_vars if name in self.trace.posterior
-        ]
+        if var_names is not None:
+            requested = [name for name in var_names if name in self.trace.posterior.data_vars]
+        else:
+            default_vars = ["adstock_decay", "hill_alpha", "hill_k"]
+            requested = [name for name in default_vars if name in self.trace.posterior.data_vars]
         if not requested:
             return pd.DataFrame(columns=columns)
 

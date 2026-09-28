@@ -126,6 +126,8 @@ reporting/
   summary_table.csv
 ```
 
+`spend_response.csv` uses `response_lift` and `response_lift_pct` as its canonical scenario metrics. Compatibility columns named `saturation_lift` and `saturation_lift_pct` contain the same values for existing consumers.
+
 ## Production Adaptation
 
 The demo runner is intentionally thin: it reads local CSVs, constructs package objects, fits once, and writes local artifacts. A production workflow should keep the same component boundaries but replace the outer orchestration with a scheduled job:

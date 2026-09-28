@@ -17,57 +17,37 @@ This guide covers running `calmmm` in a production environment — containerised
 | arviz | ≥ 0.16 |
 | numba | < 0.61 (llvmlite build constraint) |
 
-PyMC compiles PyTensor graphs using a C compiler at runtime. The host must have a working C toolchain (`gcc` or `clang`). On containers this is typically already present in a `python:3.11-slim-bookworm` base image.
+PyMC can compile PyTensor graphs using a C compiler at runtime. The repository image sets `PYTENSOR_FLAGS=cxx=` so the minimal image does not need a compiler. Extend the image with `gcc` and `g++`, then override `PYTENSOR_FLAGS`, when compiled PyTensor operations are required for production throughput.
 
-**PyTensor compilation cache** — PyTensor caches compiled ops to `~/.pytensor` (or `$PYTENSOR_FLAGS_compiledir`). Mount a persistent volume at this path to avoid recompiling across container runs, which can add 30–120 s to cold starts.
+When C compilation is enabled, PyTensor caches compiled operations under `~/.pytensor` or the `compiledir` set in `PYTENSOR_FLAGS`. Mount that directory on a persistent volume to avoid compiling the same graph for each batch run.
 
 ---
 
 ## 2. Containerisation
 
-### Dockerfile
+The checked-in `Dockerfile` has two targets:
 
-```dockerfile
-FROM python:3.11-slim-bookworm
+- `test` installs the `dev` dependency group from `pyproject.toml` and runs the fast pytest suite.
+- `runtime` installs production dependencies and uses `scripts/run_demo_fit.py` as its entry point.
 
-# System deps: C compiler for PyTensor + lapack/blas for scipy
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        gcc g++ libopenblas-dev liblapack-dev \
-    && rm -rf /var/lib/apt/lists/*
+Build and test in a clean environment:
 
-WORKDIR /app
-
-# Install Python deps first for layer caching
-COPY pyproject.toml uv.lock ./
-RUN pip install uv && uv sync --frozen --no-dev
-
-# Copy source
-COPY calmmm/ ./calmmm/
-
-# PyTensor compile cache (overridden by a mounted volume in production)
-ENV PYTENSOR_FLAGS="compiledir=/tmp/pytensor_cache"
-
-CMD ["python", "-m", "calmmm_jobs.run"]
+```bash
+docker build --target test -t calmmm-test .
+docker run --rm calmmm-test
 ```
 
-### Docker Compose (local dev / CI)
+Run the bundled demo and retain its outputs on the host:
 
-```yaml
-services:
-  mmm-fit:
-    build: .
-    volumes:
-      - pytensor_cache:/tmp/pytensor_cache
-      - ./data:/app/data:ro
-      - ./artifacts:/app/artifacts
-    environment:
-      - CALMMM_MODE=map
-      - CALMMM_DATA_PATH=/app/data/weekly.parquet
-      - CALMMM_OUTPUT_PATH=/app/artifacts
-
-volumes:
-  pytensor_cache:
+```bash
+docker build --target runtime -t calmmm:local .
+docker run --rm \
+  -v "$PWD/artifacts:/app/artifacts" \
+  -v "$PWD/reporting:/app/reporting" \
+  calmmm:local --mode map
 ```
+
+The entry point accepts the same arguments as `scripts/run_demo_fit.py`. The valid inference modes are `map`, `vi`, and `sample`.
 
 ---
 
@@ -84,7 +64,7 @@ uv lock --upgrade
 uv sync --frozen
 ```
 
-Never `pip install` in production without a lockfile. The `numba<0.61` pin is intentional — `llvmlite>=0.44` fails to build from source on many Linux hosts; do not remove it without testing.
+Do not install project dependencies in production without the lockfile. The `numba<0.61` pin is intentional because `llvmlite>=0.44` fails to build from source on many Linux hosts; do not remove it without testing.
 
 ---
 
@@ -96,13 +76,12 @@ A typical production MMM job runs on a weekly schedule:
 fetch_data → fit_model → compute_attribution → write_outputs → alert_on_divergence
 ```
 
-### Recommended job structure
+### Production wrapper example
 
 ```python
-# calmmm_jobs/run.py
+# This application-owned wrapper is not part of the calmmm package.
 import os
 import pandas as pd
-import arviz as az
 from calmmm import MMMData, HierarchicalMMM, IncrementalityTests
 from calmmm.attribution.roi import compute_roi
 from calmmm.calibration.lift import compute_model_lift
@@ -114,7 +93,7 @@ def run():
     experiments_path = os.environ.get("CALMMM_EXPERIMENTS_PATH")
 
     # 1. Load data
-    df = pd.read_parquet(data_path)
+    df = pd.read_csv(data_path)
     data = MMMData.from_dataframe(df, ...)
 
     # 2. Load experiments (optional)
@@ -125,8 +104,25 @@ def run():
 
     # 3. Fit
     mmm = HierarchicalMMM(holdout_fraction=0.2)
-    fit = mmm.fit(data, experiments=exps, mode=mode,
-                  draws=2000, tune=1000, target_accept=0.9, chains=4)
+    if mode == "sample":
+        inference_kwargs = {
+            "draws": 2000,
+            "tune": 1000,
+            "target_accept": 0.9,
+            "chains": 4,
+        }
+    elif mode == "vi":
+        inference_kwargs = {"n": 10_000, "draws": 1000}
+    elif mode == "map":
+        inference_kwargs = {"maxeval": 2000}
+    else:
+        raise ValueError(f"Unsupported CALMMM_MODE: {mode}")
+    fit = mmm.fit(
+        data,
+        experiments=exps,
+        mode=mode,
+        **inference_kwargs,
+    )
 
     # 4. Save trace
     if fit.trace is not None:
@@ -134,7 +130,7 @@ def run():
 
     # 5. Attribution
     roi = compute_roi(fit)
-    roi.to_parquet(f"{output_path}/roi.parquet")
+    roi.to_csv(f"{output_path}/roi.csv", index=False)
 
     # 6. Holdout metrics
     metrics = fit.holdout_metrics()
@@ -203,7 +199,7 @@ if not bad_rhat.empty:
 |---|---|---|
 | Posterior trace | `.nc` (NetCDF via ArviZ) | `fit.trace.to_netcdf(path)` / `az.from_netcdf(path)` |
 | MAP parameters | `.npz` or `.pkl` | `np.savez(path, **fit.map_params)` |
-| ROI table | `.parquet` | Append-friendly; partition by run date |
+| ROI table | `.csv` | One row per KPI and channel |
 | Holdout metrics | `.json` | Lightweight; easy to ingest into a metrics store |
 | Calibration check | `.csv` | One row per experiment per run |
 
@@ -213,7 +209,7 @@ Store artifacts in versioned paths:
 s3://your-bucket/mmm/
   2026-06-21/
     trace.nc
-    roi.parquet
+    roi.csv
     holdout_metrics.json
     calibration_check.csv
   latest -> 2026-06-21/   # symlink or redirect
@@ -241,7 +237,7 @@ Recommended instance class: `c6i.2xlarge` (AWS) or equivalent — 8 vCPU / 16 GB
 |---|---|---|
 | `PYTENSOR_FLAGS` | — | Override compile dir: `compiledir=/mnt/pytensor_cache` |
 | `CALMMM_MODE` | `sample` | Inference mode passed to `fit()` |
-| `CALMMM_DATA_PATH` | — | Path to input parquet |
+| `CALMMM_DATA_PATH` | — | Path to input CSV |
 | `CALMMM_EXPERIMENTS_PATH` | — | Path to experiments CSV (optional) |
 | `CALMMM_OUTPUT_PATH` | — | Directory for output artifacts |
 | `PYTHONFAULTHANDLER` | `1` | Enable fault handler for segfault debugging |
@@ -254,11 +250,7 @@ Set `PYTENSOR_FLAGS="cxx="` to disable C compilation entirely (CPU-only, slower)
 
 ### Recommended pipeline stages
 
-1. **Lint / type check** — `ruff check calmmm/`, `mypy calmmm/`
-2. **Fast tests** — `pytest -m 'not slow'` (< 60 s)
-3. **Slow tests** — `pytest -m slow` (PyMC inference; gate to nightly or pre-release)
-4. **Build container** — `docker build -t calmmm:$GIT_SHA .`
-5. **Integration smoke test** — run MAP fit on synthetic data inside the container
+The checked-in GitHub Actions workflow builds the `test` target, runs the fast suite, builds the `runtime` target, and runs an eight-week MAP inference smoke job. Use `pytest -m slow` as a scheduled or pre-release extension when the full inference suite is needed.
 
 ### Synthetic smoke-test data
 

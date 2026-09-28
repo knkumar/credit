@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import logging
+import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 from calmmm.attribution.contributions import marginal_contributions
 
@@ -53,6 +57,16 @@ def compute_roi(fit: "MMMFit") -> pd.DataFrame:
     )
 
     merged = total_contrib.merge(spend_by_channel, on="channel", how="left")
-    merged["roi"] = merged["total_contribution"] / merged["total_spend"]
+    merged["total_spend"] = merged["total_spend"].fillna(0.0)
+    safe_spend = np.where(merged["total_spend"] < 1e-8, 1.0, merged["total_spend"])
+    merged["roi"] = np.where(
+        merged["total_spend"] >= 1e-8,
+        merged["total_contribution"] / safe_spend,
+        np.nan,
+    )
+
+    zero_spend = merged[merged["total_spend"] < 1e-8]["channel"].unique().tolist()
+    if zero_spend:
+        logger.warning("Near-zero training-window spend for channel(s) %s; ROI set to NaN", zero_spend)
 
     return merged[["kpi", "channel", "total_contribution", "total_spend", "roi"]].reset_index(drop=True)

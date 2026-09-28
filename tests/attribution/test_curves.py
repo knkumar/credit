@@ -9,12 +9,16 @@ class _FakeData:
     channels = ["search", "social"]
 
 
+class _FakeMMM:
+    _media_max = [400.0, 200.0]
+
 class _FakeFit:
     data = _FakeData()
+    _mmm = _FakeMMM()
 
 
 def test_spend_response_report_uses_saturation_curves(monkeypatch):
-    def fake_saturation_curve(_fit, channel, n_points=100):
+    def fake_saturation_curve(_fit, channel, n_points=100, grid_multiplier=2.0):
         curves = {
             "search": pd.DataFrame(
                 {
@@ -58,6 +62,8 @@ def test_spend_response_report_uses_saturation_curves(monkeypatch):
     assert round(search["increased_response"], 6) == 0.44
     assert round(search["response_lift"], 6) == 0.04
     assert round(search["response_lift_pct"], 6) == 0.10
+    assert search["saturation_lift"] == search["response_lift"]
+    assert search["saturation_lift_pct"] == search["response_lift_pct"]
 
 
 @pytest.mark.slow
