@@ -16,14 +16,23 @@ Calibrated Hierarchical Bayesian Media Mix Model.
 
 ## Installation
 
+Install the latest version on the main branch directly from GitHub:
+
 ```bash
-# requires Python ≥ 3.10
-pip install -e .          # editable install from source
-# or with uv:
+python -m pip install "git+https://github.com/knkumar/credit.git@main"
+```
+
+Replace `main` with a branch name, tag, or commit hash to install a specific revision. The installer needs Git and Python 3.10 or newer.
+
+For a local checkout:
+
+```bash
+python -m pip install -e .
+# or, to use the repository's locked dependencies:
 uv sync
 ```
 
-Dependencies: `pymc>=5`, `pytensor>=2.18`, `numpy>=1.24`, `pandas>=2.0`, `scipy>=1.10`, `arviz>=0.16`.
+Dependencies are declared in `pyproject.toml` and installed automatically by pip.
 
 ## Quick start
 
