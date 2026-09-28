@@ -1,3 +1,22 @@
 .agents/
 .serena/
 uv.lock
+
+# Python and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# LaTeX build outputs
+/paper/*.aux
+/paper/*.log
+/paper/*.out
+/paper/*.toc
+/paper/*.bbl
+/paper/*.blg
+/paper/*.fls
+/paper/*.fdb_latexmk
+/paper/*.synctex.gz
+/paper/*.xdv
+/paper/*.dvi
+/paper/main.pdf
