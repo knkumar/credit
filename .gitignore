@@ -1,6 +1,5 @@
 .agents/
 .serena/
-uv.lock
 
 # Python and test caches
 __pycache__/
