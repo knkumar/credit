@@ -47,7 +47,7 @@ def saturation_curve(fit: "MMMFit", channel: str, n_points: int = 50, grid_multi
         alpha_c = alpha_c[..., np.newaxis]
         k_c = k_c[..., np.newaxis]
 
-    x_pow = np.clip(x_scaled, 1e-9, None) ** alpha_c
+    x_pow = np.clip(x_scaled, 0.0, None) ** alpha_c
     k_pow = k_c ** alpha_c
     saturation = x_pow / (x_pow + k_pow)
 
@@ -97,16 +97,16 @@ def spend_response_report(
         
         increased_responses = np.interp(spend_arr * spend_multiplier, curve["spend"].to_numpy(), curve["saturation"].to_numpy())
         increased_response = float(increased_responses.mean())
-        saturation_lift = increased_response - current_response
+        response_lift = increased_response - current_response
         if current_response != 0.0:
-            saturation_lift_pct = saturation_lift / current_response
+            response_lift_pct = response_lift / current_response
         else:
             logger.warning(
                 "Saturation lift percentage could not be calculated for channel %r "
                 "due to a zero baseline response.",
                 channel,
             )
-            saturation_lift_pct = np.nan
+            response_lift_pct = np.nan
 
         rows.append(
             {
@@ -116,8 +116,11 @@ def spend_response_report(
                 "increased_spend": increased_spend,
                 "current_response": current_response,
                 "increased_response": increased_response,
-                "saturation_lift": saturation_lift,
-                "saturation_lift_pct": saturation_lift_pct,
+                "response_lift": response_lift,
+                "response_lift_pct": response_lift_pct,
+                # Compatibility aliases for callers using the original names.
+                "saturation_lift": response_lift,
+                "saturation_lift_pct": response_lift_pct,
             }
         )
 

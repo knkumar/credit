@@ -417,6 +417,7 @@ PYTENSOR_FLAGS='cxx=' uv run python -m calmmm.reporting.visualization
 ### Spend response
 
 Shows the modeled saturation response change, in percentage points, from the configured spend scenario. In the demo output the scenario is a 10% spend increase for each channel.
+The CSV uses `response_lift` for the absolute change in the saturation response index and `response_lift_pct` for the change relative to the current response. The producer also writes the older `saturation_lift` and `saturation_lift_pct` aliases so existing consumers continue to work.
 
 ![Spend scenario response by channel](../reporting/spend_response.svg)
 

@@ -60,8 +60,10 @@ def test_spend_response_report_uses_saturation_curves(monkeypatch):
     assert round(search["increased_spend"], 6) == 220.0
     assert search["current_response"] == 0.4
     assert round(search["increased_response"], 6) == 0.44
-    assert round(search["saturation_lift"], 6) == 0.04
-    assert round(search["saturation_lift_pct"], 6) == 0.10
+    assert round(search["response_lift"], 6) == 0.04
+    assert round(search["response_lift_pct"], 6) == 0.10
+    assert search["saturation_lift"] == search["response_lift"]
+    assert search["saturation_lift_pct"] == search["response_lift_pct"]
 
 
 @pytest.mark.slow

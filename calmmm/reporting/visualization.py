@@ -142,6 +142,10 @@ def _resolve_report_path(parts: tuple[str, str], reporting_dir: Path, artifacts_
 
 
 def _render_spend_response(df: pd.DataFrame, out: Path) -> None:
+    if "response_lift" not in df and "saturation_lift" in df:
+        df = df.assign(response_lift=df["saturation_lift"])
+    if "response_lift_pct" not in df and "saturation_lift_pct" in df:
+        df = df.assign(response_lift_pct=df["saturation_lift_pct"])
     df = df.dropna(subset=["response_lift"])
     if df.empty: return
     labels = df["channel"].astype(str).tolist()
