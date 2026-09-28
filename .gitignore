@@ -20,3 +20,6 @@ __pycache__/
 /paper/*.xdv
 /paper/*.dvi
 /paper/main.pdf
+
+# Downloadable research data
+/paper/data/raw/criteo-research-uplift-v2.1.csv.gz
