@@ -1,5 +1,7 @@
 .git
+.agent
 .agents
+AGENTS.md
 .pytest_cache
 .serena
 .venv

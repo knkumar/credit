@@ -1,24 +1,10 @@
 .agents/
 .serena/
+/.agent/
+/paper/
+/AGENTS.md
 
 # Python and test caches
 __pycache__/
 *.py[cod]
 .pytest_cache/
-
-# LaTeX build outputs
-/paper/*.aux
-/paper/*.log
-/paper/*.out
-/paper/*.toc
-/paper/*.bbl
-/paper/*.blg
-/paper/*.fls
-/paper/*.fdb_latexmk
-/paper/*.synctex.gz
-/paper/*.xdv
-/paper/*.dvi
-/paper/main.pdf
-
-# Downloadable research data
-/paper/data/raw/criteo-research-uplift-v2.1.csv.gz
