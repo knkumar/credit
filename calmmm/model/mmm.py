@@ -63,6 +63,9 @@ class HierarchicalMMM:
         self._media_max: Optional[np.ndarray] = None
         self._fourier_matrix: Optional[np.ndarray] = None
         self._pop_array: Optional[np.ndarray] = None
+        self._ctrl_array: Optional[np.ndarray] = None
+        self._ctrl_mean: Optional[np.ndarray] = None
+        self._ctrl_std: Optional[np.ndarray] = None
         self._calibration_targets: list = []
         self._last_experiments = None
 
@@ -92,6 +95,15 @@ class HierarchicalMMM:
         """
         validate_mmmdata(data).raise_if_errors()
 
+        # A reused model must learn preprocessing statistics from the new
+        # dataset. A fresh model may already contain copied training scalers;
+        # holdout evaluation relies on that explicit transfer before its first
+        # build.
+        if self._data is not None and self._data is not data:
+            self._media_max = None
+            self._ctrl_mean = None
+            self._ctrl_std = None
+
         self._data = data
         coords = build_coords(data, n_fourier_pairs=self.n_fourier_pairs)
         obs_array, media_array, pop_array = build_arrays(data)
@@ -107,7 +119,7 @@ class HierarchicalMMM:
         self._train_mask = train_mask
 
         # Scale media per-channel by panel max (from train set)
-        if getattr(self, "_media_max", None) is None:
+        if self._media_max is None:
             media_max = media_array[train_mask].max(axis=(0, 1), keepdims=True)  # [1, 1, C]
             global_max = media_array.max(axis=(0, 1), keepdims=True)
             if (global_max == 0.0).any():
@@ -174,7 +186,7 @@ class HierarchicalMMM:
         self._fourier_matrix = fourier_matrix
         self._pop_array = pop_array
         if ctrl_array is not None:
-            if getattr(self, "_ctrl_mean", None) is None:
+            if self._ctrl_mean is None:
                 ctrl_train_raw = ctrl_array[train_mask]
                 self._ctrl_std = np.where(ctrl_train_raw.std(axis=0) == 0, 1.0, ctrl_train_raw.std(axis=0))
                 self._ctrl_mean = ctrl_train_raw.mean(axis=0)

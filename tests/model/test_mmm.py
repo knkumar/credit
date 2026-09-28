@@ -1,6 +1,7 @@
 import numpy as np
 import pymc as pm
 import pytest
+from copy import deepcopy
 
 from calmmm.model.mmm import HierarchicalMMM
 from calmmm.model.fit import MMMFit
@@ -57,6 +58,36 @@ def test_build_model_holdout_mask_correct(mmmdata):
     assert mmm._train_mask.sum() == T - n_holdout
     assert not mmm._train_mask[-1]
     assert mmm._train_mask[0]
+
+
+def test_build_model_resets_scalers_for_different_dataset(mmmdata):
+    mmm = HierarchicalMMM(holdout_fraction=0.2)
+    mmm.build_model(mmmdata)
+    original_media_max = mmm._media_max.copy()
+    original_ctrl_mean = mmm._ctrl_mean.copy()
+
+    shifted_data = deepcopy(mmmdata)
+    shifted_data.media["spend"] *= 10.0
+    shifted_data.controls["value"] += 5.0
+    mmm.build_model(shifted_data)
+
+    np.testing.assert_allclose(mmm._media_max, original_media_max * 10.0)
+    np.testing.assert_allclose(mmm._ctrl_mean, original_ctrl_mean + 5.0)
+
+
+def test_first_build_preserves_explicitly_copied_training_scalers(mmmdata):
+    training_mmm = HierarchicalMMM(holdout_fraction=0.2)
+    training_mmm.build_model(mmmdata)
+
+    eval_mmm = HierarchicalMMM(holdout_fraction=0.0)
+    eval_mmm._media_max = training_mmm._media_max.copy()
+    eval_mmm._ctrl_mean = training_mmm._ctrl_mean.copy()
+    eval_mmm._ctrl_std = training_mmm._ctrl_std.copy()
+    eval_mmm.build_model(mmmdata)
+
+    np.testing.assert_array_equal(eval_mmm._media_max, training_mmm._media_max)
+    np.testing.assert_array_equal(eval_mmm._ctrl_mean, training_mmm._ctrl_mean)
+    np.testing.assert_array_equal(eval_mmm._ctrl_std, training_mmm._ctrl_std)
 
 
 def test_build_model_deterministic_mu(mmmdata):

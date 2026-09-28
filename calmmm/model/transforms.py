@@ -7,9 +7,8 @@ import pytensor.tensor as pt
 
 # PyTensor (differentiable) counterparts of the NumPy reference implementations
 # in calmmm/transforms/adstock.py and calmmm/transforms/saturation.py.
-# The NumPy versions validate inputs (e.g. decay ∈ [0,1)) and omit the ε=1e-9
-# denominator guard; the PyTensor versions rely on priors for range enforcement
-# and add ε for numerical stability.
+# The NumPy versions validate inputs (e.g. decay ∈ [0,1)); the PyTensor
+# versions rely on priors for range enforcement.
 
 
 def geometric_adstock_pt(X, decay):
@@ -57,8 +56,10 @@ def hill_saturation_pt(X, alpha, k):
     # Broadcast alpha and k over leading [T, G] dims for X shape [T, G, C]
     a = alpha[None, None, :]
     kk = k[None, None, :]
-    # Clip to non-negative: fractional alpha on negative X yields NaN in real arithmetic
-    X_safe = pt.clip(X, 1e-9, np.inf)
+    # Match the NumPy reference implementation, including exact zero response
+    # for zero or negative input when alpha is small but positive.
+    X_safe = pt.clip(X, 0.0, np.inf)
     x_pow = X_safe ** a
     k_pow = kk ** a
-    return x_pow / (x_pow + k_pow + 1e-9)
+    response = x_pow / (x_pow + k_pow)
+    return pt.where(pt.eq(X_safe, 0.0), 0.0, response)

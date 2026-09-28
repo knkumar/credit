@@ -1,8 +1,10 @@
 import numpy as np
+import pytensor
 import pytensor.tensor as pt
 import pytest
 
 from calmmm.model.transforms import geometric_adstock_pt, hill_saturation_pt
+from calmmm.transforms.saturation import hill_saturation
 
 
 # --- geometric_adstock_pt ---
@@ -96,4 +98,48 @@ def test_hill_zero_input_is_zero():
         pt.as_tensor_variable(np.array([1.0, 2.0])),
         pt.as_tensor_variable(np.array([0.5, 1.0])),
     ).eval()
-    np.testing.assert_allclose(result, 0.0, atol=1e-6)
+    np.testing.assert_array_equal(result, 0.0)
+
+
+@pytest.mark.parametrize("alpha", [1e-12, 1e-6, 0.5, 2.0])
+def test_hill_matches_numpy_reference_including_small_alpha(alpha):
+    x = np.array(
+        [
+            [[-1.0, 0.0], [1e-12, 0.25]],
+            [[1.0, 2.0], [10.0, 100.0]],
+        ],
+        dtype="float64",
+    )
+    alpha_values = np.array([alpha, alpha], dtype="float64")
+    k_values = np.array([0.5, 2.0], dtype="float64")
+
+    actual = hill_saturation_pt(
+        pt.as_tensor_variable(x),
+        pt.as_tensor_variable(alpha_values),
+        pt.as_tensor_variable(k_values),
+    ).eval()
+    expected = np.stack(
+        [hill_saturation(x[..., idx], alpha, k_values[idx]) for idx in range(2)],
+        axis=-1,
+    )
+
+    np.testing.assert_allclose(actual, expected, rtol=1e-13, atol=0.0)
+    np.testing.assert_array_equal(actual[x <= 0.0], 0.0)
+
+
+def test_hill_zero_input_has_finite_parameter_gradients():
+    x = pt.tensor3("x")
+    alpha = pt.vector("alpha")
+    k = pt.vector("k")
+    response = hill_saturation_pt(x, alpha, k)
+    gradients = pt.grad(response.sum(), [alpha, k])
+    evaluate = pytensor.function([x, alpha, k], gradients)
+
+    for exponent in (1e-12, 0.5, 2.0):
+        evaluated = evaluate(
+            np.zeros((1, 1, 1)),
+            np.array([exponent]),
+            np.array([0.5]),
+        )
+        for gradient in evaluated:
+            np.testing.assert_array_equal(gradient, 0.0)
